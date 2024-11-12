@@ -8,10 +8,10 @@ export class User {
   user_id: number;
 
   @Column({ name: 'first_name' })
-  first_name: string;
+  firstname: string;
 
   @Column({ name: 'last_name' })
-  last_name: string;
+  lastname: string;
 
   @Column()
   email: string;
