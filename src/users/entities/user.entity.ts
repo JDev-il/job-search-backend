@@ -3,7 +3,7 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { JobSearch } from '../../job-search/entities/job-search.entity';
 
 @Entity({ name: 'users', schema: 'public' })
-export class User {
+export class UserRegistration {
   @PrimaryGeneratedColumn()
   user_id: number;
 
@@ -27,4 +27,16 @@ export class User {
   // One-to-Many relationship with JobSearch
   @OneToMany(() => JobSearch, (jobSearch) => jobSearch.user)
   jobSearhData: JobSearch[];
+}
+
+@Entity()
+export class UserLogin {
+  @PrimaryGeneratedColumn()
+  userId: number;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column()
+  password: string; // Important: Store hashed passwords in production
 }

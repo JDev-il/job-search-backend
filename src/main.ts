@@ -1,21 +1,22 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import * as dotenv from 'dotenv';
 import { AppModule } from './app.module';
-import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+
+dotenv.config({ path: './.env' }); // Explicit path
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalGuards(new JwtAuthGuard());
   app.get(ConfigService);
   app.enableCors({
-    origin: 'http://localhost:4200', // Allow requests only from the Angular app's URL
-    methods: 'GET,POST,PUT,DELETE',  // Specify allowed methods if needed
-    credentials: true,               // Allow cookies if necessary
+    // origin: 'http://localhost:4200',
+    methods: 'GET,POST,PUT,DELETE',
+    credentials: true,
   });
   app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,            // Strip any properties not in the DTO
-    forbidNonWhitelisted: true, // Throw error if unexpected properties are found
+    whitelist: true,
+    // forbidNonWhitelisted: true, // Throw error if unexpected properties are found
     transform: true,
   }));
   await app.listen(process.env.PORT ?? 3000);

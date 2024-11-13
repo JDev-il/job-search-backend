@@ -4,19 +4,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationsModule } from './applications/applications.module';
+import { AuthModule } from './auth/auth.module';
 import { JobSearch } from './job-search/entities/job-search.entity';
 import { JobSearchController } from './job-search/job-search.controller';
 import { JobSearchService } from './job-search/job-search.service';
-import { User } from './users/entities/user.entity';
+import { UserRegistration } from './users/entities/user.entity';
 import { UsersModule } from './users/users.module';
-
 @Module({
   imports: [
     UsersModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
+    ConfigModule.forRoot({ isGlobal: true }), // This makes ConfigModule available globally
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -27,10 +24,11 @@ import { UsersModule } from './users/users.module';
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        entities: [User, JobSearch],
+        entities: [UserRegistration, JobSearch],
         synchronize: false,  // Set to false in production
       }),
     }),
+    AuthModule,
     ApplicationsModule,
   ],
   controllers: [AppController, JobSearchController],

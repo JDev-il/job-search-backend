@@ -3,12 +3,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JobSearch } from '../job-search/entities/job-search.entity';
-import { User } from './entities/user.entity';
+import { UserRegistration } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UserService } from './users.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, JobSearch]), HttpModule,       // Needed for httpService
+  imports: [TypeOrmModule.forFeature([UserRegistration, JobSearch]), HttpModule,       // Needed for httpService
     ConfigModule],
   controllers: [UsersController],
   providers: [UserService],

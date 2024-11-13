@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateUserDto } from '../auth/dto/user.dto/create-user.dto';
-import { User } from './entities/user.entity';
+import { CreateUserDto } from '../auth/dto/user/create-user.dto';
+import { UserRegistration } from './entities/user.entity';
 
 @Injectable()
 export class UserService {
@@ -10,11 +10,11 @@ export class UserService {
   private emailPattern: RegExp = new RegExp(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/);
 
   constructor(
-    @InjectRepository(User) // Inject User repository for database operations
-    private readonly userRepository: Repository<User>,
+    @InjectRepository(UserRegistration) // Inject User repository for database operations
+    private readonly userRepository: Repository<UserRegistration>,
   ) { }
 
-  async findUsers(): Promise<User[]> {
+  async findUsers(): Promise<UserRegistration[]> {
     const users = await this.userRepository.find();
     if (!users) {
       throw new NotFoundException(`Users were not found`);
@@ -22,7 +22,7 @@ export class UserService {
     return users;
   }
 
-  async findOneByEmail(email: string): Promise<User> {
+  async findOneByEmail(email: string): Promise<UserRegistration> {
     if (!this.emailPattern.test(email)) {
       throw NotFoundException.createBody(null, 'Invalid email address', 501);
     }
@@ -31,7 +31,7 @@ export class UserService {
     });
   }
 
-  async findOneById(user_id: number): Promise<User> {
+  async findOneById(user_id: number): Promise<UserRegistration> {
     const user = await this.userRepository.findOne({
       where: { user_id },
       relations: ['jobSearhData']
@@ -42,7 +42,7 @@ export class UserService {
     return user;
   }
 
-  async createUser(createUserDto: CreateUserDto): Promise<User> {
+  async createUser(createUserDto: CreateUserDto): Promise<UserRegistration> {
     const user = this.userRepository.create(createUserDto);
     try {
       return await this.userRepository.save(user);
