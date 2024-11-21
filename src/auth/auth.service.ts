@@ -1,66 +1,52 @@
 // src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
-import { UserRegistration } from '../users/entities/user.entity';
-import { AuthorizedUserDto, LoginUserDto, UniqueUserDto } from './dto/user/login-user.dto';
-
+import { UserRegistrationEntity } from '../users/entities/user.entity';
+import { jwtConstants } from './constants';
+import { AuthorizedUserDto, LoginUserDto, ValidatedLoginDto, VerifiedUserDto } from './dto/user/login-user.dto';
 @Injectable()
 export class AuthService {
-  private rawSecretKey!: string;
 
   constructor(
-    @InjectRepository(UserRegistration)
-    private usersRepository: Repository<UserRegistration>,
-    private jwtService: JwtService, private configService: ConfigService) {
-    this.rawSecretKey = this.configService.get<string>('JWT_SECRET_KEY');
+    @InjectRepository(UserRegistrationEntity)
+    private usersRepository: Repository<UserRegistrationEntity>,
+    private jwtService: JwtService
+  ) { }
+
+  async userLogin(loginUserDto: LoginUserDto): Promise<boolean> {
+    return await this.userValidation(loginUserDto);
+  }
+
+  async tokenGenerator(user: AuthorizedUserDto & LoginUserDto): Promise<ValidatedLoginDto | null> {
+    const payload = <VerifiedUserDto>{ email: user.email, password: user.password };
+    const token = this.jwtService.sign(payload);
+    return { email: user.email, auth_token: token }
+  }
+
+  async tokenVerification(token: string): Promise<AuthorizedUserDto | UnauthorizedException> {
+    const verifiedToken = await this.jwtService.verify(token, { secret: jwtConstants.secret });
+    if (!verifiedToken) {
+      throw new UnauthorizedException('Token is not valid!');
+    }
+    return verifiedToken;
   }
 
 
-  async validateUser(loginUserDto: LoginUserDto): Promise<AuthorizedUserDto> {
-    const { email, password } = loginUserDto;
-    const user = await this.usersRepository.findOne({ where: { email } });
-    if (user && user.password === password) {
-      return <AuthorizedUserDto>{ userId: user.user_id, email: user.email };
-    }
-    return null;
-  }
-
-
-  async userLogin(user: UniqueUserDto): Promise<AuthorizedUserDto | string> {
-    const email = user.email;
-    const userObj = await this.usersRepository.findOne({ where: { email } });
-    if (userObj && user.auth_token) {
-      const toVerify = <AuthorizedUserDto>{ userId: userObj.user_id, email: userObj.email, auth_token: user.auth_token }
-      return this.verifyUserToken(toVerify);
-    }
-    else if (userObj && !user.auth_token) {
-      const toGenerate = <AuthorizedUserDto>{ userId: userObj.user_id, email: userObj.email }
-      return this.tokenGenerator(toGenerate);
-    }
-    else {
-      throw new UnauthorizedException('Invalid credentials')
+  public async userValidation(loginUser: LoginUserDto): Promise<boolean> {
+    const { email, password } = <LoginUserDto>loginUser;
+    try {
+      const user = await this.usersRepository.findOne({ where: { email } });
+      const passwordVerification = await bcrypt.compare(password, user.password);
+      if (passwordVerification) {
+        return true
+      }
+    } catch {
+      throw new UnauthorizedException('User does not exist!');
     }
   }
 
 
-  async verifyUserToken(user: AuthorizedUserDto): Promise<AuthorizedUserDto> {
-    const { email, userId } = user;
-    const userPayload = { userId, email };
-    const token = this.jwtService.sign(userPayload);
-    return <AuthorizedUserDto>{
-      auth_token: token,
-      userId: user.userId,
-      email: user.email,
-    }
-  }
-
-  private async tokenGenerator(user: AuthorizedUserDto) {
-    const { email, userId } = user;
-    const userPayload = { userId, email };
-    const token = this.jwtService.sign(userPayload);
-    return token;
-  }
 }

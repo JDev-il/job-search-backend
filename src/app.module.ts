@@ -8,7 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { JobSearch } from './job-search/entities/job-search.entity';
 import { JobSearchController } from './job-search/job-search.controller';
 import { JobSearchService } from './job-search/job-search.service';
-import { UserRegistration } from './users/entities/user.entity';
+import { UserRegistrationEntity } from './users/entities/user.entity';
 import { UsersModule } from './users/users.module';
 @Module({
   imports: [
@@ -24,7 +24,7 @@ import { UsersModule } from './users/users.module';
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        entities: [UserRegistration, JobSearch],
+        entities: [UserRegistrationEntity, JobSearch],
         synchronize: false,  // Set to false in production
       }),
     }),

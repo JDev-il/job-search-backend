@@ -1,5 +1,5 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { UserRegistration } from '../../users/entities/user.entity';
+import { UserRegistrationEntity } from '../../users/entities/user.entity';
 
 @Entity('job_search') // Table name is 'job_search'
 export class JobSearch {
@@ -34,7 +34,7 @@ export class JobSearch {
   hunch: string;
 
   // Many-to-One relation with User
-  @ManyToOne(() => UserRegistration, (user) => user.jobSearhData, { onDelete: 'CASCADE' })
+  @ManyToOne(() => UserRegistrationEntity, (user) => user.jobSearhData, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' }) // Foreign key column name
-  user: UserRegistration;
+  user: UserRegistrationEntity;
 }

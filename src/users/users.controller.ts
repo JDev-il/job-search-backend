@@ -7,6 +7,11 @@ export class UsersController {
 
   constructor(private readonly usersService: UserService) { }
 
+  @Get('all')
+  async getAllUsers() { //! For Development Purposes Only!
+    return await this.usersService.findUsers();
+  }
+
   @Get()
   async getUsers(@Query('email') email?: string) {
     if (email) {

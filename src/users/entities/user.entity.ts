@@ -3,7 +3,7 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { JobSearch } from '../../job-search/entities/job-search.entity';
 
 @Entity({ name: 'users', schema: 'public' })
-export class UserRegistration {
+export class UserRegistrationEntity {
   @PrimaryGeneratedColumn()
   user_id: number;
 
@@ -29,8 +29,8 @@ export class UserRegistration {
   jobSearhData: JobSearch[];
 }
 
-@Entity()
-export class UserLogin {
+@Entity({ name: 'users', schema: 'public' })
+export class UserLoginEntity {
   @PrimaryGeneratedColumn()
   userId: number;
 

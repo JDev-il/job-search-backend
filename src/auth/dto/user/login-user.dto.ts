@@ -1,16 +1,17 @@
 import { IsEmail, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 
-export class UniqueUserDto {
-
-  @IsOptional()
-  @IsString()
-  auth_token?: string;
+export class ValidatedLoginDto { // User needs to go through validation in order to proceed
 
   @IsEmail()
   email: string;
+
+  @IsString()
+  auth_token: string;
+
 }
 
-export class LoginUserDto {
+
+export class LoginUserDto { // User already has a token, a username and a password
   @IsEmail()
   email: string;
 
@@ -24,7 +25,7 @@ export class LoginUserDto {
 }
 
 
-export class AuthorizedUserDto {
+export class AuthorizedUserDto { // User is fully authorized with userId, email, iat, exp and a valid token
   @IsNumber()
   userId: number;
 
@@ -32,15 +33,35 @@ export class AuthorizedUserDto {
   email: string;
 
   @IsOptional()
-  @IsNumber()
-  iat: number;
-
-  @IsOptional()
-  @IsNumber()
-  exp: number;
-
-  @IsOptional()
   @IsString()
   auth_token?: string;
+
+  @IsOptional()
+  @IsNumber()
+  iat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exp?: number;
+
+}
+
+
+export class VerifiedUserDto {
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @IsOptional()
+  @IsNumber()
+  iat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  exp?: number;
 
 }
