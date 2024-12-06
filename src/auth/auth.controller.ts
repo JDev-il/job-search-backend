@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { ValidatedLoginDto } from './dto/user/login-user.dto';
+import { AuthorizedUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
 import { JwtAuthGuard } from './guards/jwt.guard';
 
 @Controller('auth')
@@ -10,40 +10,33 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('login')
-  async login(@Req() req: Request): Promise<ValidatedLoginDto> {
+  async login(@Req() req: Request): Promise<ValidatedLoginDto | null> {
     const isUserValid = await this.authService.userValidation(req.body);
     if (isUserValid) {
       if (req.headers?.authorization) {
         return <ValidatedLoginDto>await this.tokenAuthenticator(req);
       }
-      const newToken = <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
-      return newToken;
-    }
-  }
-
-  @Get('verify')
-  async verify(@Req() req: Request) {
-    if (req.headers?.authorization) {
-      return await this.tokenAuthenticator(req);
-    }
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('sign')
-  async sign(@Req() req: Request): Promise<any> {
-    const tokenObj = <ValidatedLoginDto>await this.authService.tokenGenerator(req.body) // returns type ValidatedLoginDto
-    if (tokenObj) {
-      return tokenObj;
+      return <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
     }
     return null;
   }
 
+  @Get('verify')
+  async verify(@Req() req: Request): Promise<AuthorizedUserDto | null> {
+    return req.headers?.authorization ? await this.tokenAuthenticator(req) : null
+  }
 
-  private async tokenAuthenticator(req: Request) {
+  @UseGuards(JwtAuthGuard)
+  @Post('signtoken')
+  async sign(@Req() req: Request): Promise<ValidatedLoginDto | null> {
+    const tokenObj = await this.authService.tokenGenerator(req.body);
+    return !tokenObj ? null : tokenObj;
+  }
+
+
+  private async tokenAuthenticator(req: Request): Promise<AuthorizedUserDto | null> {
     const token = req.headers?.authorization.split(' ')[1];
     const verified = await this.authService.tokenVerification(token);
-    if (verified) {
-      return verified;
-    }
+    return !verified ? null : verified;
   }
 }

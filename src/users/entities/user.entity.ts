@@ -1,42 +1,30 @@
 // user.entity.ts
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { JobSearch } from '../../job-search/entities/job-search.entity';
+import { JobSearchEntity } from '../../job-search/entities/job-search.entity';
 
 @Entity({ name: 'users', schema: 'public' })
-export class UserRegistrationEntity {
-  @PrimaryGeneratedColumn()
-  user_id: number;
-
-  @Column({ name: 'first_name' })
-  firstname: string;
-
-  @Column({ name: 'last_name' })
-  lastname: string;
-
-  @Column()
-  email: string;
-
-  @Column()
-  password: string;
-
-  @Column({ name: 'created_at', type: 'timestamp' })
-  createdAt: Date;
-
-  @Column({ name: 'updated_at', type: 'timestamp' })
-  updatedAt: Date;
-  // One-to-Many relationship with JobSearch
-  @OneToMany(() => JobSearch, (jobSearch) => jobSearch.user)
-  jobSearhData: JobSearch[];
-}
-
-@Entity({ name: 'users', schema: 'public' })
-export class UserLoginEntity {
-  @PrimaryGeneratedColumn()
+export class UserEntity {
+  @PrimaryGeneratedColumn({ name: 'user_id' })
   userId: number;
 
-  @Column({ unique: true })
+  @Column({ name: 'first_name' })
+  firstName: string;
+
+  @Column({ name: 'last_name' })
+  lastName: string;
+
+  @Column({ name: 'email', unique: true })
   email: string;
 
-  @Column()
-  password: string; // Important: Store hashed passwords in production
+  @Column({ name: 'password' })
+  password: string;
+
+  @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+
+  @Column({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  updatedAt: Date;
+  // One-to-Many relationship with JobSearch
+  @OneToMany(() => JobSearchEntity, (jobSearch) => jobSearch.user)
+  jobSearchData: JobSearchEntity[];
 }

@@ -12,13 +12,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false, // Ensure token has not expired
     });
   }
-
   async validate(payload: any) {
     return { userId: payload.userId, email: payload.email };
   }
-  // async validate(payload: any) {
-    
-  //   // Return decoded payload to the request (e.g., req.user)
-  //   return { userId: payload.userId, email: payload.email };
-  // }
 }

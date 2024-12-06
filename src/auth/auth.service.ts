@@ -4,15 +4,15 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
-import { UserRegistrationEntity } from '../users/entities/user.entity';
+import { UserEntity } from '../users/entities/user.entity';
 import { jwtConstants } from './constants';
 import { AuthorizedUserDto, LoginUserDto, ValidatedLoginDto, VerifiedUserDto } from './dto/user/login-user.dto';
 @Injectable()
 export class AuthService {
 
   constructor(
-    @InjectRepository(UserRegistrationEntity)
-    private usersRepository: Repository<UserRegistrationEntity>,
+    @InjectRepository(UserEntity)
+    private usersRepository: Repository<UserEntity>,
     private jwtService: JwtService
   ) { }
 
@@ -26,11 +26,8 @@ export class AuthService {
     return { email: user.email, auth_token: token }
   }
 
-  async tokenVerification(token: string): Promise<AuthorizedUserDto | UnauthorizedException> {
+  async tokenVerification(token: string): Promise<AuthorizedUserDto> {
     const verifiedToken = await this.jwtService.verify(token, { secret: jwtConstants.secret });
-    if (!verifiedToken) {
-      throw new UnauthorizedException('Token is not valid!');
-    }
     return verifiedToken;
   }
 

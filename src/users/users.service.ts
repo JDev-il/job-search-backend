@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from '../auth/dto/user/create-user.dto';
-import { LoginUserDto } from '../auth/dto/user/login-user.dto';
-import { UserRegistrationEntity } from './entities/user.entity';
+import { NewUserDto } from '../auth/dto/user/login-user.dto';
+import { UserEntity } from './entities/user.entity';
 
 @Injectable()
 export class UserService {
@@ -12,11 +12,11 @@ export class UserService {
   private emailPattern: RegExp = new RegExp(/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/);
 
   constructor(
-    @InjectRepository(UserRegistrationEntity) // Inject User repository for database operations
-    private readonly userRepository: Repository<UserRegistrationEntity>,
+    @InjectRepository(UserEntity) // Inject User repository for database operations
+    private readonly userRepository: Repository<UserEntity>,
   ) { }
 
-  async findUsers(): Promise<UserRegistrationEntity[]> {
+  async findUsers(): Promise<UserEntity[]> {
     const users = await this.userRepository.find();
     if (!users) {
       throw new NotFoundException(`Users were not found`);
@@ -24,37 +24,34 @@ export class UserService {
     return users;
   }
 
-  async findOneByEmail(email: string): Promise<UserRegistrationEntity> {
+  async findOneByEmail(email: string): Promise<UserEntity> {
     if (!this.emailPattern.test(email)) {
       throw NotFoundException.createBody(null, 'Invalid email address', 501);
     }
     return await this.userRepository.findOne({
-      where: { email },
+      where: { email }
     });
   }
 
-  async findOneById(user_id: number): Promise<UserRegistrationEntity> {
+  async findOneById(userId: number): Promise<UserEntity> {
     const user = await this.userRepository.findOne({
-      where: { user_id },
-      relations: ['jobSearhData']
+      where: { userId },
+      relations: ['job_search']
     });
     if (!user) {
-      throw new NotFoundException(`User with ID ${user_id} not found`);
+      throw new NotFoundException(`User with ID ${userId} not found`);
     }
     return user;
   }
 
-  async createUser(createUserDto: CreateUserDto): Promise<LoginUserDto> {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+  async createUser(userToAdd: CreateUserDto): Promise<NewUserDto> {
+    const hashedPassword = await bcrypt.hash(userToAdd.password, 10);
     const newUser = this.userRepository.create({
-      ...createUserDto,
+      ...userToAdd,
       password: hashedPassword,
     });
     try {
-      const saved = await this.userRepository.save(newUser) as LoginUserDto;
-      if (saved) {
-        return saved
-      }
+      return await this.userRepository.save(newUser) as NewUserDto;
     } catch (error) {
       throw Error('User was not saved!')
     }

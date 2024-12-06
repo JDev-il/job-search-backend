@@ -1,8 +1,8 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { UserRegistrationEntity } from '../../users/entities/user.entity';
+import { UserEntity } from '../../users/entities/user.entity';
 
-@Entity('job_search') // Table name is 'job_search'
-export class JobSearch {
+@Entity({ name: 'job_search', schema: 'public' })
+export class JobSearchEntity {
   @PrimaryGeneratedColumn({ name: 'job_id' })
   jobId: number;
 
@@ -24,17 +24,20 @@ export class JobSearch {
   @Column({ name: 'application_platform' })
   applicationPlatform: string;
 
-  @Column({ name: 'application_date', type: 'date' })
+  @Column({ name: 'application_date', type: 'date' }) // Ensure correct type
   applicationDate: Date;
 
-  @Column({ name: 'notes', nullable: true })
+  @Column({ name: 'notes', nullable: true }) // Allow null if not always provided
   notes: string;
 
-  @Column({ name: 'hunch', nullable: true })
+  @Column({ name: 'hunch', nullable: true }) // Allow null if not always provided
   hunch: string;
 
   // Many-to-One relation with User
-  @ManyToOne(() => UserRegistrationEntity, (user) => user.jobSearhData, { onDelete: 'CASCADE' })
+  @ManyToOne(() => UserEntity, (user) => user.jobSearchData, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' }) // Foreign key column name
-  user: UserRegistrationEntity;
+  user: UserEntity;
+
+  @Column({ name: 'user_created_at', type: 'timestamp', nullable: true }) // Regular timestamp column
+  userCreatedAt: Date;
 }

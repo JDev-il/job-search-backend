@@ -7,9 +7,24 @@ export class ValidatedLoginDto { // User needs to go through validation in order
 
   @IsString()
   auth_token: string;
-
 }
 
+export class NewUserDto {
+  @IsString()
+  firstName: string;
+
+  @IsString()
+  lastName: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+
+}
 
 export class LoginUserDto { // User already has a token, a username and a password
   @IsEmail()
