@@ -18,26 +18,22 @@ export class JobSearchEntity {
   @Column({ name: 'position_type' })
   positionType: string;
 
-  @Column({ name: 'position_stack' })
-  positionStack: string;
+  @Column({ name: 'position_stack', type: 'text', array: true })
+  positionStack: string[];
 
   @Column({ name: 'application_platform' })
   applicationPlatform: string;
 
-  @Column({ name: 'application_date', type: 'date' }) // Ensure correct type
+  @Column({ name: 'application_applied_date', type: 'date' })
   applicationDate: Date;
 
-  @Column({ name: 'notes', nullable: true }) // Allow null if not always provided
+  @Column({ name: 'notes', nullable: true })
   notes: string;
 
-  @Column({ name: 'hunch', nullable: true }) // Allow null if not always provided
+  @Column({ name: 'hunch', nullable: true })
   hunch: string;
 
-  // Many-to-One relation with User
   @ManyToOne(() => UserEntity, (user) => user.jobSearchData, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' }) // Foreign key column name
+  @JoinColumn({ name: 'user_id' }) // Reference the correct column
   user: UserEntity;
-
-  @Column({ name: 'user_created_at', type: 'timestamp', nullable: true }) // Regular timestamp column
-  userCreatedAt: Date;
 }

@@ -1,4 +1,3 @@
-// user.entity.ts
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { JobSearchEntity } from '../../job-search/entities/job-search.entity';
 
@@ -22,9 +21,6 @@ export class UserEntity {
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  updatedAt: Date;
-  // One-to-Many relationship with JobSearch
   @OneToMany(() => JobSearchEntity, (jobSearch) => jobSearch.user)
   jobSearchData: JobSearchEntity[];
 }

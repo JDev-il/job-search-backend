@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { Request } from 'express';
+import { ApplicationDataDto } from '../auth/dto/data/application-data.dto';
 import { JobSearchEntity } from './entities/job-search.entity';
 import { JobSearchService } from './job-search.service';
 
@@ -8,12 +10,26 @@ export class JobSearchController {
 
   @Get('data')
   async getAllDataByUserID(@Query('user_id') user_id: string): Promise<JobSearchEntity[] | null> {
-    return await this.jobSearchService.findUserData(+user_id) || null;
+    return await this.jobSearchService.findApplicationData(+user_id) || null;
   }
 
   @Post('add')
-  async addApplicationData(@Req() req: Request): Promise<any> {
-    //! Partial process - move on to phase 2 of job-serach-implementation
+  async addApplicationData(@Req() req: Request): Promise<void> {
+    const data = req.body as ApplicationDataDto;
+    if (!data.userId) {
+      throw new BadRequestException('User ID is required');
+    }
+    await this.jobSearchService.addNewApplicationRow(data);
+  }
+
+  @Post('edit')
+  async editApplicationData(@Req() req: Request): Promise<void> {
+    console.log(req);
+  // const data = req.body as ApplicationDataDto;
+  // if (!data.userId) {
+  //   throw new BadRequestException('User ID is required');
+  // }
+  // await this.jobSearchService.addNewApplicationRow(data);
     return;
   }
 }

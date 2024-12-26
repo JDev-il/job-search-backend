@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserEntity } from '../users/entities/user.entity';
+import { ApplicationDataDto } from '../auth/dto/data/application-data.dto';
 import { JobSearchEntity } from './entities/job-search.entity';
 
 @Injectable()
@@ -11,23 +11,37 @@ export class JobSearchService {
     private readonly jobSearchRepository: Repository<JobSearchEntity>,
   ) { }
 
-  async findUserData(userId: number): Promise<JobSearchEntity[]> {
-    const jobs = await this.jobSearchRepository.findBy({ user: { userId: userId } });
-    return jobs;
+  async findApplicationData(id: number): Promise<JobSearchEntity[]> {
+    const jobApplications = await this.jobSearchRepository.find({
+      where: { user: { userId: id } },
+      relations: ['user'],
+    });
+    const applications = [...jobApplications].map(data => { return { ...data, user: {} } }) as JobSearchEntity[];
+    return applications;
   }
 
-  async addNewApplicationRow() {
-    const newJobSearch = this.jobSearchRepository.create({
-      status: 'Pending',
-      companyName: 'Example Corp',
-      companyLocation: 'San Francisco',
-      positionType: 'Frontend Developer',
-      positionStack: 'React',
-      applicationPlatform: 'LinkedIn',
-      applicationDate: new Date('2024-12-01'),
-      user: new UserEntity, // UserEntity instance
-    });
+  async addNewApplicationRow(applicationDetails: ApplicationDataDto) {
+    const positionStack = applicationDetails.positionStack;
+    console.log(positionStack);
 
-    await this.jobSearchRepository.save(newJobSearch);
+    const newJobSearch = this.jobSearchRepository.create(<JobSearchEntity>{
+      status: applicationDetails.status,
+      companyName: applicationDetails.companyName,
+      companyLocation: applicationDetails.companyLocation,
+      positionType: applicationDetails.positionType,
+      positionStack: positionStack,
+      applicationPlatform: applicationDetails.applicationPlatform,
+      applicationDate: applicationDetails.applicationDate,
+      notes: applicationDetails.notes,
+      hunch: applicationDetails.hunch,
+      user: { userId: applicationDetails.userId }, // Associate with an existing user
+    });
+    try {
+      const savedJobSearch = await this.jobSearchRepository.save(newJobSearch);
+      return savedJobSearch;
+    } catch (error) {
+      console.error('Error saving application:', error);
+      throw new InternalServerErrorException('Could not save application');
+    }
   }
 }
