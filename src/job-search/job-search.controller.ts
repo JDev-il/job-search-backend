@@ -24,7 +24,6 @@ export class JobSearchController {
 
   @Post('edit')
   async editApplicationData(@Req() req: Request): Promise<void> {
-    console.log(req);
   // const data = req.body as ApplicationDataDto;
   // if (!data.userId) {
   //   throw new BadRequestException('User ID is required');
