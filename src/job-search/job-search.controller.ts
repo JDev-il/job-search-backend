@@ -22,13 +22,25 @@ export class JobSearchController {
     await this.jobSearchService.addNewApplicationRow(data);
   }
 
+  @Post('remove')
+  async removeApplicationData(@Req() req: Request): Promise<void> {
+    const data = req.body as ApplicationDataDto;
+    if (!data.userId) {
+      throw new BadRequestException('User ID is required');
+    }
+    await this.jobSearchService.removeApplicationData(data);
+  }
+
   @Post('edit')
   async editApplicationData(@Req() req: Request): Promise<void> {
-  // const data = req.body as ApplicationDataDto;
-  // if (!data.userId) {
-  //   throw new BadRequestException('User ID is required');
-  // }
-  // await this.jobSearchService.addNewApplicationRow(data);
+    const data = req.body as ApplicationDataDto;
+
+
+    // const data = req.body as ApplicationDataDto;
+    // if (!data.userId) {
+    //   throw new BadRequestException('User ID is required');
+    // }
+    // await this.jobSearchService.addNewApplicationRow(data);
     return;
   }
 }

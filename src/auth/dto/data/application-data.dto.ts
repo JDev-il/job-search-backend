@@ -5,6 +5,10 @@ export class ApplicationDataDto {
   @IsNotEmpty()
   userId?: number;
 
+  @IsInt()
+  @IsOptional()
+  jobId?: number;
+
   @IsString()
   @IsNotEmpty()
   status: string;

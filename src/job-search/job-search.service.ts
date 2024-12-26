@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApplicationDataDto } from '../auth/dto/data/application-data.dto';
@@ -12,15 +12,22 @@ export class JobSearchService {
   ) { }
 
   async findApplicationData(id: number): Promise<JobSearchEntity[]> {
-    const jobApplications = await this.jobSearchRepository.find({
-      where: { user: { userId: id } },
-      relations: ['user'],
-    });
-    const applications = [...jobApplications].map(data => { return { ...data, user: {} } }) as JobSearchEntity[];
-    return applications;
+    try {
+      const jobApplications = await this.jobSearchRepository.find({
+        where: { user: { userId: id } },
+        relations: ['user'],
+      });
+      const applications = [...jobApplications].map(data => { return { ...data, user: {} } }) as JobSearchEntity[];
+      return applications;
+    }
+    catch (error) {
+      console.error('Error fetching applications:', error);
+      throw new InternalServerErrorException('Could not find applications');
+    }
   }
 
   async addNewApplicationRow(applicationDetails: ApplicationDataDto) {
+    //TODO | NEXT>>: Add an option to differ between edit req and add req
     const newJobSearch = this.jobSearchRepository.create(<JobSearchEntity>{
       status: applicationDetails.status,
       companyName: applicationDetails.companyName,
@@ -38,6 +45,21 @@ export class JobSearchService {
     } catch (error) {
       console.error('Error saving application:', error);
       throw new InternalServerErrorException('Could not save application');
+    }
+  }
+
+  async removeApplicationData(application: ApplicationDataDto): Promise<void> {
+    try {
+      const deleteResult = await this.jobSearchRepository.delete({
+        jobId: application.jobId,
+        user: { userId: application.userId },
+      });
+      if (deleteResult.affected === 0) {
+        throw new NotFoundException('Application not found or you do not have permissions to delete it');
+      }
+    } catch (error) {
+      console.error('Error deleting application:', error);
+      throw new InternalServerErrorException('Could not delete application');
     }
   }
 }
