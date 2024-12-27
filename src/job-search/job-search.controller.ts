@@ -9,8 +9,8 @@ export class JobSearchController {
   constructor(private readonly jobSearchService: JobSearchService) { }
 
   @Get('data')
-  async getAllDataByUserID(@Query('user_id') user_id: string): Promise<JobSearchEntity[] | null> {
-    return await this.jobSearchService.findApplicationData(+user_id) || null;
+  async getAllDataByUserID(@Query('user_id') user_id: string): Promise<JobSearchEntity[]> {
+    return await this.jobSearchService.getApplications(+user_id) || null;
   }
 
   @Post('add')
@@ -23,12 +23,13 @@ export class JobSearchController {
   }
 
   @Post('remove')
-  async removeApplicationData(@Req() req: Request): Promise<void> {
+  async removeApplicationData(@Req() req: Request): Promise<JobSearchEntity[]> {
     const data = req.body as ApplicationDataDto;
     if (!data.userId) {
       throw new BadRequestException('User ID is required');
     }
-    await this.jobSearchService.removeApplicationData(data);
+    return await this.jobSearchService.removeApplicationData(data);
+
   }
 
   @Post('edit')
