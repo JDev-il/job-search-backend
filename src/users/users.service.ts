@@ -52,7 +52,7 @@ export class UserService {
     });
     try {
       return await this.userRepository.save(newUser) as NewUserDto;
-    } catch (error) {
+    } catch (error) {      
       throw Error('User was not saved!')
     }
   }

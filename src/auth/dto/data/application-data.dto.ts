@@ -3,6 +3,7 @@ import { IsArray, IsDate, IsInt, IsNotEmpty, IsOptional, IsString } from "class-
 export class ApplicationDataDto {
   @IsInt()
   @IsNotEmpty()
+  @IsOptional()
   userId?: number;
 
   @IsInt()

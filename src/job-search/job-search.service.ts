@@ -29,9 +29,8 @@ export class JobSearchService {
     }
   }
 
-  async addNewApplicationRow(applicationDetails: ApplicationDataDto): Promise<JobSearchEntity> {
-    //TODO | NEXT>>: Add an option to differ between edit req and add req
-    const newJobSearch = this.jobSearchRepository.create(<JobSearchEntity>{
+  async addNewApplication(applicationDetails: ApplicationDataDto): Promise<JobSearchEntity> {
+    const application = this.jobSearchRepository.create(<JobSearchEntity>{
       status: applicationDetails.status,
       companyName: applicationDetails.companyName,
       companyLocation: applicationDetails.companyLocation,
@@ -44,7 +43,7 @@ export class JobSearchService {
       user: { userId: applicationDetails.userId }, // Associate with an existing user
     });
     try {
-      const applicationSaved = await this.jobSearchRepository.save(newJobSearch);
+      const applicationSaved = await this.jobSearchRepository.save(application);
       return applicationSaved
     } catch (error) {
       console.error('Error saving application:', error);
@@ -52,19 +51,61 @@ export class JobSearchService {
     }
   }
 
-  async removeApplicationData(application: ApplicationDataDto): Promise<JobSearchEntity[]> {
+  async updateApplication(applicationDetails: ApplicationDataDto): Promise<JobSearchEntity> {
     try {
-      const deleteResult = await this.jobSearchRepository.delete({
-        jobId: application.jobId,
-        user: { userId: application.userId }
+      const application = await this.jobSearchRepository.findOne({
+        where: {
+          jobId: applicationDetails.jobId,
+          user: { userId: applicationDetails.userId },
+        },
+        relations: ['user'],
       });
-      if (deleteResult.affected === 0) {
-        throw new NotFoundException('Application not found or you do not have permission to delete it');
+
+      if (!application) {
+        throw new NotFoundException('Application not found or you do not have permission to update it');
       }
-      return await this.getApplications(application.userId);
+
+      Object.assign(application, {
+        status: applicationDetails.status,
+        companyName: applicationDetails.companyName,
+        companyLocation: applicationDetails.companyLocation,
+        positionType: applicationDetails.positionType,
+        positionStack: applicationDetails.positionStack,
+        applicationPlatform: applicationDetails.applicationPlatform,
+        applicationDate: applicationDetails.applicationDate,
+        notes: applicationDetails.notes,
+        hunch: applicationDetails.hunch,
+      });
+
+      return await this.jobSearchRepository.save(application);
     } catch (error) {
-      console.error('Error deleting application:', error);
-      throw new InternalServerErrorException('Could not delete application');
+      console.error('Error updating application:', error);
+      throw new InternalServerErrorException('Could not update application');
+    }
+  }
+
+  async removeApplicationRows(applications: ApplicationDataDto[]): Promise<JobSearchEntity[]> {
+    try {
+      if (!applications || applications.length === 0) {
+        throw new NotFoundException('No applications provided for deletion.');
+      }
+      const userId = applications[0].userId;
+      const jobIds = applications.map(app => app.jobId);
+      const query = this.jobSearchRepository
+        .createQueryBuilder()
+        .delete()
+        .from(JobSearchEntity)
+        .where('user_id = :userId', { userId })
+        .andWhere('job_id IN (:...jobIds)', { jobIds });
+
+      const deleteResult = await query.execute();
+      if (deleteResult.affected === 0) {
+        throw new NotFoundException('No matching applications found to delete.');
+      }
+      return await this.getApplications(userId);
+    } catch (error) {
+      console.error('Error deleting applications:', error);
+      throw new InternalServerErrorException('Could not delete applications');
     }
   }
 }

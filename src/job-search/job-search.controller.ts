@@ -19,29 +19,42 @@ export class JobSearchController {
     if (!data.userId) {
       throw new BadRequestException('User ID is required');
     }
-    await this.jobSearchService.addNewApplicationRow(data);
+    await this.jobSearchService.addNewApplication(data);
   }
 
-  @Post('remove')
-  async removeApplicationData(@Req() req: Request): Promise<JobSearchEntity[]> {
-    const data = req.body as ApplicationDataDto;
-    if (!data.userId) {
+  @Post('update')
+  async editApplicationData(@Req() req: Request): Promise<void> {
+    if (!req.body.userId) {
       throw new BadRequestException('User ID is required');
     }
-    return await this.jobSearchService.removeApplicationData(data);
-
+    await this.jobSearchService.updateApplication(req.body);
+    return;
   }
 
-  @Post('edit')
-  async editApplicationData(@Req() req: Request): Promise<void> {
-    const data = req.body as ApplicationDataDto;
+  @Post('removemultiple')
+  async removeApplicationsData(@Req() req: Request): Promise<JobSearchEntity[]> {
+    const rawApplicationsData = req.body;
+    const userId = req.body.userId;
 
+    if (!rawApplicationsData || typeof rawApplicationsData !== 'object') {
+      throw new BadRequestException('Invalid data format');
+    }
 
-    // const data = req.body as ApplicationDataDto;
-    // if (!data.userId) {
-    //   throw new BadRequestException('User ID is required');
-    // }
-    // await this.jobSearchService.addNewApplicationRow(data);
-    return;
+    const applicationsArray = Object.values(rawApplicationsData).filter((entry) =>
+      typeof entry === 'object' && 'jobId' in entry
+    ) as ApplicationDataDto[];
+
+    const mappedApplicationsArray = applicationsArray.map(application => {
+      return <ApplicationDataDto>{
+        ...application,
+        userId: userId
+      }
+    })
+
+    if (mappedApplicationsArray.length === 0) {
+      throw new BadRequestException('No applications found for deletion');
+    }
+
+    return await this.jobSearchService.removeApplicationRows(mappedApplicationsArray);
   }
 }
