@@ -20,7 +20,6 @@ export class JobSearchService {
       const allApplications = [...jobApplications].map(data => {
         return { ...data, user: {} }
       }) as JobSearchEntity[];
-
       return allApplications;
     }
     catch (error) {

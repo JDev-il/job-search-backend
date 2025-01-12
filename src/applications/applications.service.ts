@@ -39,11 +39,4 @@ export class ApplicationsService {
       throw new NotFoundException(`Application with ID ${id} not found`);
     }
   }
-
-  // async getApplicationAndUser(applicationId: number, userId: number) {
-  //   const application = await this.findOne(applicationId);
-  //   // Use UsersService to fetch user data
-  //   const user = await this.userService.findOne(userId);
-  //   return { application, user };
-  // }
 }
