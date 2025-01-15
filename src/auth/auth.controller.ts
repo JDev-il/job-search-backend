@@ -1,29 +1,52 @@
-import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { JsonWebTokenError } from 'jsonwebtoken';
+import { HelperService } from './../services/helper.service';
 import { AuthService } from './auth.service';
 import { AuthorizedUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
 import { JwtAuthGuard } from './guards/jwt.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService, private helperService: HelperService) { }
+
+  //! TEMP FOR TESTING
+  @Get('logintest')
+  async logintest(@Body() userDto: any) {
+    userDto = <unknown>{
+      email: 'jdev@gmail.com',
+      password: 'jdev2025'
+    }
+    const user = await this.authService.validateUser(userDto.email, userDto.password);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.authService.generateToken(user);
+  }
+  //! TEMP FOR TESTING
 
   @UseGuards(JwtAuthGuard)
   @Post('login')
-  async login(@Req() req: Request): Promise<ValidatedLoginDto | null> {
+  async login(@Req() req: Request): Promise<ValidatedLoginDto | UnauthorizedException> {
     const isUserValid = await this.authService.userValidation(req.body);
     if (isUserValid) {
-      if (req.headers?.authorization) {
-        return <ValidatedLoginDto>await this.tokenAuthenticator(req);
-      }
       return <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
     }
-    return null;
+    return new UnauthorizedException();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('verify')
-  async verify(@Req() req: Request): Promise<AuthorizedUserDto | null> {
-    return req.headers?.authorization ? await this.tokenAuthenticator(req) : null
+  async verify(@Req() req: Request): Promise<AuthorizedUserDto | JsonWebTokenError> {
+    if (req.headers.authorization) {
+      const token = this.helperService.tokenExtractor(req);
+      return await this.authService.tokenVerification(token);
+    }
+
+    //^ CONTINUE FROM HERE AND COMPLETE FIXING TOKEN ADJUSTMENTS >>> 
+
+    return new JsonWebTokenError('No Token Found')
   }
 
   @UseGuards(JwtAuthGuard)
@@ -34,9 +57,17 @@ export class AuthController {
   }
 
 
-  private async tokenAuthenticator(req: Request): Promise<AuthorizedUserDto | null> {
-    const token = req.headers?.authorization.split(' ')[1];
-    const verified = await this.authService.tokenVerification(token);
-    return !verified ? null : verified;
+  //! TEMP FOR TESTING
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+  // Initiates Google OAuth
   }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req) {
+    return this.authService.googleLogin(req.user); // Calls googleLogin from AuthService
+  }
+  //! TEMP FOR TESTING
 }
