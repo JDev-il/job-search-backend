@@ -33,6 +33,7 @@ export class JobSearchService {
       status: applicationDetails.status,
       companyName: applicationDetails.companyName,
       companyLocation: applicationDetails.companyLocation,
+      companyCity: applicationDetails.companyCity,
       positionType: applicationDetails.positionType,
       positionStack: applicationDetails.positionStack,
       applicationPlatform: applicationDetails.applicationPlatform,

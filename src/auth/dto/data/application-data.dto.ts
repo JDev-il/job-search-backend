@@ -24,6 +24,10 @@ export class ApplicationDataDto {
 
   @IsString()
   @IsNotEmpty()
+  companyCity: string;
+
+  @IsString()
+  @IsNotEmpty()
   positionType: string;
 
   @IsArray()

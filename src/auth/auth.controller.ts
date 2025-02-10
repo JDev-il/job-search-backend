@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-import { JsonWebTokenError } from 'jsonwebtoken';
 import { HelperService } from './../services/helper.service';
 import { AuthService } from './auth.service';
 import { AuthorizedUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
@@ -33,20 +32,16 @@ export class AuthController {
     if (isUserValid) {
       return <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
     }
-    return new UnauthorizedException();
+    return new UnauthorizedException
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('verify')
-  async verify(@Req() req: Request): Promise<AuthorizedUserDto | JsonWebTokenError> {
+  async verify(@Req() req: Request): Promise<AuthorizedUserDto> {
     if (req.headers.authorization) {
       const token = this.helperService.tokenExtractor(req);
       return await this.authService.tokenVerification(token);
     }
-
-    //^ CONTINUE FROM HERE AND COMPLETE FIXING TOKEN ADJUSTMENTS >>> 
-
-    return new JsonWebTokenError('No Token Found')
   }
 
   @UseGuards(JwtAuthGuard)

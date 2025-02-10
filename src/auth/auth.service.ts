@@ -54,7 +54,7 @@ export class AuthService {
     return { email: user.email, auth_token: token }
   }
 
-  async tokenVerification(token: string): Promise<AuthorizedUserDto | null> {
+  async tokenVerification(token: string): Promise<AuthorizedUserDto> {
     return await this.jwtService.verify(token, { secret: jwtConstants.secret });
   }
 

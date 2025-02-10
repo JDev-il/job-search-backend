@@ -15,6 +15,9 @@ export class JobSearchEntity {
   @Column({ name: 'company_location' })
   companyLocation: string;
 
+  @Column({ name: 'company_city' })
+  companyCity: string;
+
   @Column({ name: 'position_type' })
   positionType: string;
 
