@@ -28,7 +28,6 @@ export class JobSearchController {
       throw new BadRequestException('User ID is required');
     }
     await this.jobSearchService.updateApplication(req.body);
-    return;
   }
 
   @Post('removemultiple')

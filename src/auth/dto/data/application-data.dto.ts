@@ -30,10 +30,10 @@ export class ApplicationDataDto {
   @IsNotEmpty()
   positionType: string;
 
-  @IsArray()
   @IsString({ each: true })
+  @IsArray()
   @IsNotEmpty()
-  positionStack: string[];
+  positionStack: string;
 
   @IsString()
   @IsNotEmpty()
