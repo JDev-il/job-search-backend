@@ -1,5 +1,5 @@
-# Use ARM64 variant if running on Apple Silicon (M1/M2 Macs)
-FROM --platform=linux/arm64 node:18-alpine
+# Use Node.js 22 for Apple Silicon compatibility
+FROM node:22-alpine
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -10,7 +10,7 @@ RUN apk add --no-cache python3 make g++
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies inside Docker (Linux)
+# Install dependencies inside Docker
 RUN npm install --production
 
 # Reinstall bcrypt inside the container (to match Linux environment)
