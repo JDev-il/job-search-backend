@@ -22,7 +22,7 @@ export class JobSearchEntity {
   positionType: string;
 
   @Column({ name: 'position_stack', type: 'text', array: true })
-  positionStack: string[];
+  positionStack: string;
 
   @Column({ name: 'application_platform' })
   applicationPlatform: string;
