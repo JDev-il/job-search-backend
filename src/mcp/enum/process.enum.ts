@@ -1,0 +1,5 @@
+export enum ProcessType {
+  CHAT = 'CHAT',
+  AUTOMATION = 'AUTOMATION',
+  SYSTEM_TRIGGER = 'SYSTEM_TRIGGER',
+}

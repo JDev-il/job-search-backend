@@ -11,7 +11,6 @@ export class TestingService {
           Authorization: `Bearer ${jwtToken}`,
         },
       });
-      console.log('Protected Data:', response.data);
     } catch (error) {
       console.error('Error accessing protected route:', error.response?.data || error.message);
     }

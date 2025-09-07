@@ -1,4 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { JobSearchCriteriaEntity } from '../../job-search-criteria/entities/job-search-criteria.entity';
 import { JobSearchEntity } from '../../job-search/entities/job-search.entity';
 
 @Entity({ name: 'users', schema: 'public' })
@@ -23,4 +24,7 @@ export class UserEntity {
 
   @OneToMany(() => JobSearchEntity, (jobSearch) => jobSearch.user)
   jobSearchData: JobSearchEntity[];
+  // ADD THIS SECTION:
+  @OneToMany(() => JobSearchCriteriaEntity, (criteria) => criteria.user)
+  jobSearchCriteria: JobSearchCriteriaEntity[];
 }
