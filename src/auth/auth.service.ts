@@ -49,24 +49,21 @@ export class AuthService {
   //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING
 
 
-  async tokenGenerator(user: PayloadUserDto): Promise<ValidatedLoginDto | null> {
-    const existingUser = await this.usersService.findOneByEmail(user.email);
-    if (!existingUser) {
-      return null;
-    }
-    const payload = {
-      userId: existingUser.userId,
-      email: existingUser.email,
-    };
+  async tokenGenerator(user: PayloadUserDto): Promise<ValidatedLoginDto> {
+    const payload = { userId: user.userId, email: user.email };
     const token = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET_KEY'),
       expiresIn: '1d',
     });
-    return { email: existingUser.email, auth_token: token };
+    return { email: user.email, auth_token: token };
   }
 
   async tokenVerification(token: string): Promise<AuthorizedUserDto> {
-    return await this.jwtService.verify(token, { secret: this.configService.get('JWT_SECRET_KEY'), });
+    try {
+      return await this.jwtService.verify(token, { secret: this.configService.get('JWT_SECRET_KEY'), });
+    } catch {
+      throw new UnauthorizedException();
+    }
   }
 
   async userValidation(loginUser: LoginUserDto): Promise<boolean> {

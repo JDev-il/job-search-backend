@@ -41,10 +41,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('verify')
   async verify(@Req() req: Request): Promise<AuthorizedUserDto> {
-    if (req.headers.authorization) {
-      const token = this.helperService.tokenExtractor(req);
-      return await this.authService.tokenVerification(token);
-    }
+    const token = this.helperService.tokenExtractor(req);
+    return await this.authService.tokenVerification(token);
   }
 
   @UseGuards(JwtAuthGuard)

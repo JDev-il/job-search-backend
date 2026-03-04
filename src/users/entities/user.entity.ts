@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { JobSearchCriteriaEntity } from '../../job-search-criteria/entities/job-search-criteria.entity';
 import { JobSearchEntity } from '../../job-search/entities/job-search.entity';
@@ -17,6 +18,7 @@ export class UserEntity {
   email: string;
 
   @Column({ name: 'password' })
+  @Exclude()
   password: string;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
