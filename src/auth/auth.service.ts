@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 // src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -7,8 +8,7 @@ import { Repository } from 'typeorm';
 import { TestingService } from '../temp/testing.service';
 import { UserEntity } from '../users/entities/user.entity';
 import { UserService } from '../users/users.service';
-import { jwtConstants } from './constants';
-import { AuthorizedUserDto, LoginUserDto, ValidatedLoginDto, VerifiedUserDto } from './dto/user/login-user.dto';
+import { AuthorizedUserDto, LoginUserDto, PayloadUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
 @Injectable()
 export class AuthService {
 
@@ -17,6 +17,7 @@ export class AuthService {
     private usersRepository: Repository<UserEntity>,
     private jwtService: JwtService,
     private readonly usersService: UserService,
+    private configService: ConfigService,
     private readonly testingService: TestingService
   ) {
     // this.testingService.testProtectedRoute()
@@ -48,17 +49,27 @@ export class AuthService {
   //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING
 
 
-  async tokenGenerator(user: AuthorizedUserDto & LoginUserDto): Promise<ValidatedLoginDto | null> {
-    const payload = <VerifiedUserDto>{ email: user.email, password: user.password };
-    const token = this.jwtService.sign(payload);
-    return { email: user.email, auth_token: token }
+  async tokenGenerator(user: PayloadUserDto): Promise<ValidatedLoginDto | null> {
+    const existingUser = await this.usersService.findOneByEmail(user.email);
+    if (!existingUser) {
+      return null;
+    }
+    const payload = {
+      userId: existingUser.userId,
+      email: existingUser.email,
+    };
+    const token = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_SECRET_KEY'),
+      expiresIn: '1d',
+    });
+    return { email: existingUser.email, auth_token: token };
   }
 
   async tokenVerification(token: string): Promise<AuthorizedUserDto> {
-    return await this.jwtService.verify(token, { secret: jwtConstants.secret });
+    return await this.jwtService.verify(token, { secret: this.configService.get('JWT_SECRET_KEY'), });
   }
 
-  public async userValidation(loginUser: LoginUserDto): Promise<boolean> {
+  async userValidation(loginUser: LoginUserDto): Promise<boolean> {
     const { email, password } = <LoginUserDto>loginUser;
     try {
       const user = await this.usersRepository.findOne({ where: { email } });
@@ -69,6 +80,18 @@ export class AuthService {
     }
   }
 
+  async openAiCredentials(user: AuthorizedUserDto): Promise<string> {
+    const payload = {
+      sub: user.userId,
+      email: user.email,
+      scope: 'mcp',
+    };
+    const token = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('MCP_CREDENTIAL_SECRET'),
+      expiresIn: '5m',
+    });
+    return token;
+  }
 
   //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING
   async generateToken(user: any) {

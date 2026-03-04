@@ -18,11 +18,12 @@ export class MCPService {
       [ProcessType.SYSTEM_TRIGGER]: this.automationProcessor
     };
   }
-  async handle(payload: MCPBasePayload): Promise<any> {
+  async handleMcpRequest(payload: MCPBasePayload): Promise<any> {
     const processor = this.processors[payload.processType];
     if (!processor) {
       throw new Error(`Unsupported process type: ${payload.processType}`);
     }
     return processor.process(payload);
   }
+
 }

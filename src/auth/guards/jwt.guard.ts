@@ -8,9 +8,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'];
-    const user = (context.switchToWs().getData().req.body as LoginUserDto);
-    const isUser = !!user.email && !!user.password;
-    if (!authHeader && isUser) {
+    const body = request.body as LoginUserDto;
+    const isCredentials = !!body?.email && !!body?.password;
+    if (!authHeader && isCredentials) {
       return true;
     }
     return super.canActivate(context);

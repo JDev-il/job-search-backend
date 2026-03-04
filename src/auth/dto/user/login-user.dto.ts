@@ -36,7 +36,6 @@ export class LoginUserDto { // User already has a token, a username and a passwo
   auth_token?: string;
 }
 
-
 export class AuthorizedUserDto { // User is fully authorized with userId, email, iat, exp and a valid token
   @IsNumber()
   userId: number;
@@ -58,7 +57,6 @@ export class AuthorizedUserDto { // User is fully authorized with userId, email,
 
 }
 
-
 export class VerifiedUserDto {
   @IsEmail()
   email: string;
@@ -74,4 +72,12 @@ export class VerifiedUserDto {
   @IsOptional()
   @IsNumber()
   exp?: number;
+}
+
+export class PayloadUserDto {
+  @IsNumber()
+  userId: number;
+
+  @IsEmail()
+  email: string;
 }

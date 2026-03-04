@@ -3,7 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { HelperService } from './../services/helper.service';
 import { AuthService } from './auth.service';
-import { AuthorizedUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
+import { AuthorizedUserDto, PayloadUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
 import { JwtAuthGuard } from './guards/jwt.guard';
 
 @Controller('auth')
@@ -13,7 +13,7 @@ export class AuthController {
   //! TEMP FOR TESTING
   @Get('logintest')
   async logintest(@Body() userDto: any) {
-    userDto = <unknown>{
+    userDto = {
       email: 'jdev@gmail.com',
       password: 'jdev2025'
     }
@@ -27,12 +27,15 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('login')
-  async login(@Req() req: Request): Promise<ValidatedLoginDto | UnauthorizedException> {
+  async login(@Req() req: Request): Promise<ValidatedLoginDto> {
+    if (req.user) {
+      return <ValidatedLoginDto>await this.authService.tokenGenerator(req.user as PayloadUserDto);
+    }
     const isUserValid = await this.authService.userValidation(req.body);
     if (isUserValid) {
       return <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
     }
-    return new UnauthorizedException
+    throw new UnauthorizedException();
   }
 
   @UseGuards(JwtAuthGuard)
@@ -51,12 +54,23 @@ export class AuthController {
     return !tokenObj ? null : tokenObj;
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('openai')
+  async getCredentials(@Req() req: Request): Promise<{ credential: string }> {
+    const token = this.helperService.tokenExtractor(req);
+    const verifiedUser = await this.authService.tokenVerification(token);
+    if (!verifiedUser) {
+      throw new UnauthorizedException();
+    }
+    const credential = await this.authService.openAiCredentials(verifiedUser);
+    return { credential };
+  }
 
   //! TEMP FOR TESTING
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
-  // Initiates Google OAuth
+    // Initiates Google OAuth
   }
 
   @Get('google/callback')

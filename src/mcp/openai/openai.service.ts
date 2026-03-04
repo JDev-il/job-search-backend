@@ -1,8 +1,7 @@
-
-import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
+import { HttpService } from "@nestjs/axios";
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { firstValueFrom } from "rxjs";
 
 @Injectable()
 export class OpenAIService {
@@ -16,8 +15,8 @@ export class OpenAIService {
     this.apiKey = this.configService.get<string>('OPENAI_API_KEY');
   }
 
-  async ask(messages: { role: 'user' | 'assistant' | 'system', content: string } | unknown): Promise<string> {
-    console.log(this.apiKey);
+
+  async ask(messages: { role: 'user' | 'assistant' | 'system'; content: string }[] | unknown): Promise<string> {
     const headers = {
       Authorization: `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',

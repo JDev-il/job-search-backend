@@ -5,9 +5,7 @@ import { OpenAIService } from '../openai/openai.service';
 
 @Injectable()
 export class ChatProcessor implements MCPProcessor {
-  constructor(private readonly openaiService: OpenAIService) {
-    console.log("...");
-  }
+  constructor(private readonly openaiService: OpenAIService) { }
 
   async process(payload: MCPBasePayload): Promise<any> {
     const { payload: data } = payload;
