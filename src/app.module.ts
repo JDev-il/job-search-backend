@@ -28,7 +28,7 @@ import { UsersModule } from './users/users.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
         entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity],
-        synchronize: true  // Set to false in production
+        synchronize: false  // Set to false in production
       }),
     }),
     AuthModule,
