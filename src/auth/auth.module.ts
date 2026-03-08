@@ -6,11 +6,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from '../users/entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-// import { JwtStrategy } from './strategies/jwt.strategy';
 import { HelperService } from '../services/helper.service';
 import { TestingService } from '../temp/testing.service';
 import { UserService } from '../users/users.service';
-import { jwtConstants } from './constants';
 import { ProtectedController } from './protected/protected.controller';
 import { ProtectedService } from './protected/protected.service';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -25,7 +23,7 @@ import { LocalStrategy } from './strategies/local.strategy';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: jwtConstants.secret,
+        secret: configService.get<string>('JWT_SECRET_KEY'),
         signOptions: { expiresIn: "1d" },
       }),
     }),

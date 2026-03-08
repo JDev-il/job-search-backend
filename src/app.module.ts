@@ -14,20 +14,19 @@ import { UserEntity } from './users/entities/user.entity';
 import { UsersModule } from './users/users.module';
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }), // This makes ConfigModule available globally
     UsersModule,
     JobSearchModule,
     JobSearchCriteriaModule,
-    ConfigModule.forRoot({ isGlobal: true }), // This makes ConfigModule available globally
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: process.env.DB_HOST,
-        port: parseInt(process.env.DB_PORT, 10),
-        username: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        username: configService.get<string>('DB_USER'),
+        password: configService.get<string>('DB_PASSWORD'),
+        database: configService.get<string>('DB_NAME'),
         entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity],
         synchronize: false  // Set to false in production
       }),
