@@ -1,0 +1,35 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "Deploying backend..."
+
+            cd /var/www/cv-tracker/backend
+
+            git pull origin main
+
+            npm install
+
+            npm run build
+
+            pm2 restart cv-tracker-backend
+
+            pm2 save
+
+            echo "Backend deployment finished"
