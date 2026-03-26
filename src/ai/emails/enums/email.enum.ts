@@ -1,4 +1,4 @@
-export enum EmailStatus {
+export enum EmailIntent {
   CONFIRMATION = 'confirmation',
   REJECTION = 'rejection',
   INTERVIEW = 'interview',

@@ -1,27 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import { HelperService } from '../../../services/helper.service';
 import { NormalizedEmail, ParsedEmail } from './../interfaces/email.interface';
 
 @Injectable()
 export class EmailNormalizerService {
-  normalize(email: ParsedEmail): NormalizedEmail {
+
+  constructor(private helperService: HelperService) { }
+
+  public emailNormalizer(email: ParsedEmail): NormalizedEmail {
     return {
-      subject: this.clean(email.subject),
-      bodyText: this.clean(email.bodyText),
-      bodyCleaned: this.clean(this.stripQuotedReplies(email.bodyText)),
-      snippet: email.snippet ? this.clean(email.snippet) : undefined,
+      subject: this.helperService.textCleaner(email.subject),
+      bodyText: this.helperService.textCleaner(email.bodyText),
+      bodyCleaned: this.helperService.textCleaner(this.stripReplies(email.bodyText)),
+      snippet: email.snippet ? this.helperService.textCleaner(email.snippet) : undefined,
       sender: email.sender,
       senderDomain: email.senderDomain,
     };
   }
 
-  private clean(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  private stripQuotedReplies(text: string): string {
+  private stripReplies(text: string): string {
     return text
       .split('\n')
       .filter((line) => !line.trim().startsWith('>'))

@@ -33,4 +33,23 @@ export class OpenAIService {
 
     return response.data.choices[0].message.content;
   }
+
+  async askStructured<T>(messages: { role: 'user' | 'assistant' | 'system'; content: string }[]): Promise<T> {
+    const headers = {
+      Authorization: `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+
+    const body = {
+      model: 'gpt-4o',
+      messages,
+      response_format: { type: 'json_object' },
+    };
+
+    const response = await firstValueFrom(
+      this.httpService.post(this.apiUrl, body, { headers })
+    );
+
+    return JSON.parse(response.data.choices[0].message.content) as T;
+  }
 }

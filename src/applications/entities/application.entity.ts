@@ -1,12 +1,13 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { ApplicationStatus } from '../enums/application-status.enum';
 
 @Entity()
 export class Application {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  status: string;
+  @Column({ type: 'enum', enum: ApplicationStatus })
+  status: ApplicationStatus;
 
   @Column()
   companyName: string;
