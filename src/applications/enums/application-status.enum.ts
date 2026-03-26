@@ -1,0 +1,17 @@
+export enum ApplicationStatus {
+  AWAITING_RESPONSE = 'Awaiting response',
+  HR_REACHED_BACK = 'HR reached me back',
+  AWAITING_DECISION = 'Awaiting decision',
+  DECIDED_TO_PASS = 'Decided to pass',
+  LOW_SALARY = 'Below expectations',
+  DID_NOT_PASS_HR = "Didn't pass HR",
+  AWAITING_INTERVIEW = 'Awaiting interview',
+  INTERVIEW_SCHEDULED = 'Interview scheduled',
+  AWAITING_RESULTS = 'Awaiting interview results',
+  REJECTED = 'Rejected',
+  PASSED = 'Passed',
+  PROBABLY_NOT = "Probably didn't pass",
+  REAPPLIED = 'Reapplied',
+  ARCHIVED = 'Archived',
+  RECEIVED_CONTRACT = 'Received a contract',
+}

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EmailModule } from './ai/emails/email-intelligence.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationsModule } from './applications/applications.module';
@@ -16,6 +17,7 @@ import { UsersModule } from './users/users.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // This makes ConfigModule available globally
     UsersModule,
+    EmailModule,
     JobSearchModule,
     JobSearchCriteriaModule,
     TypeOrmModule.forRootAsync({
