@@ -122,7 +122,8 @@ export class UserService {
     });
     try {
       return await this.userRepository.save(newUser) as NewUserDto;
-    } catch (error) {      
+    } catch (error) {
+      console.error('[createUser] DB error:', error);
       throw Error('User was not saved!')
     }
   }
