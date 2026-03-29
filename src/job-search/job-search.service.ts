@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, NotFoundException } from '@ne
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApplicationDataDto } from '../auth/dto/data/application-data.dto';
+import { ApplicationStatus } from '../applications/enums/application-status.enum';
 import { JobSearchEntity } from './entities/job-search.entity';
 
 @Injectable()
@@ -29,7 +30,7 @@ export class JobSearchService {
   }
 
   async addNewApplication(applicationDetails: ApplicationDataDto): Promise<JobSearchEntity> {
-    const application = this.jobSearchRepository.create(<JobSearchEntity>{
+    const application = this.jobSearchRepository.create({
       status: applicationDetails.status,
       companyName: applicationDetails.companyName,
       companyLocation: applicationDetails.companyLocation,
@@ -82,6 +83,30 @@ export class JobSearchService {
       console.error('Error updating application:', error);
       throw new InternalServerErrorException('Could not update application');
     }
+  }
+
+  async findMatchingApplication(userId: number, companyName: string): Promise<JobSearchEntity | null> {
+    return this.jobSearchRepository
+      .createQueryBuilder('js')
+      .where('js.user_id = :userId', { userId })
+      .andWhere('LOWER(js.company_name) LIKE :pattern', { pattern: `%${companyName.toLowerCase()}%` })
+      .andWhere('js.status NOT IN (:...excluded)', {
+        excluded: [ApplicationStatus.REJECTED, ApplicationStatus.ARCHIVED],
+      })
+      .orderBy('js.application_applied_date', 'DESC')
+      .limit(1)
+      .getOne();
+  }
+
+  async createAutoApplication(userId: number, companyName: string, status: ApplicationStatus): Promise<JobSearchEntity> {
+    const application = this.jobSearchRepository.create({
+      companyName,
+      status,
+      applicationDate: new Date(),
+      isAutoCreated: true,
+      user: { userId },
+    });
+    return this.jobSearchRepository.save(application);
   }
 
   async removeApplicationRows(applications: ApplicationDataDto[]): Promise<JobSearchEntity[]> {

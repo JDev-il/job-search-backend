@@ -24,6 +24,27 @@ export class UserEntity {
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
+  @Column({ name: 'updated_at', type: 'timestamp', nullable: true })
+  updatedAt: Date | null;
+
+  @Column({ name: 'gmail_access_token', nullable: true })
+  gmailAccessToken: string | null;
+
+  @Column({ name: 'gmail_refresh_token', nullable: true })
+  gmailRefreshToken: string | null;
+
+  @Column({ name: 'gmail_token_expiry', type: 'timestamp', nullable: true })
+  gmailTokenExpiry: Date | null;
+
+  @Column({ name: 'gmail_history_id', nullable: true })
+  gmailHistoryId: string | null;
+
+  @Column({ name: 'gmail_email', nullable: true })
+  gmailEmail: string | null;
+
+  @Column({ name: 'google_id', nullable: true })
+  googleId: string | null;
+
   @OneToMany(() => JobSearchEntity, (jobSearch) => jobSearch.user)
   jobSearchData: JobSearchEntity[];
   // ADD THIS SECTION:
