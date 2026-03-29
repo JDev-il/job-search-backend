@@ -4,6 +4,7 @@ export class AddSomeColumn1774770941978 implements MigrationInterface {
     name = 'AddSomeColumn1774770941978'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP NULL`);
         await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "google_id" character varying`);
         await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gmail_access_token" character varying`);
         await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "gmail_refresh_token" character varying`);
@@ -21,6 +22,7 @@ export class AddSomeColumn1774770941978 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "gmail_refresh_token"`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "gmail_access_token"`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "google_id"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "updated_at"`);
     }
 
 }
