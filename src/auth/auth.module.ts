@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { GmailModule } from '../gmail/gmail.module';
 import { UserEntity } from '../users/entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -15,8 +16,6 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 
-
-
 @Module({
   imports: [
     PassportModule,
@@ -27,9 +26,10 @@ import { LocalStrategy } from './strategies/local.strategy';
         signOptions: { expiresIn: "1d" },
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity]), // Register UserRegistration entity here
+    TypeOrmModule.forFeature([UserEntity]),
+    GmailModule,
   ],
-  providers: [AuthService, ProtectedService, TestingService, UserService, HelperService, JwtStrategy, LocalStrategy, GoogleStrategy], // Register LocalStrategy here
+  providers: [AuthService, ProtectedService, TestingService, UserService, HelperService, JwtStrategy, LocalStrategy, GoogleStrategy],
   controllers: [AuthController, ProtectedController],
 })
 

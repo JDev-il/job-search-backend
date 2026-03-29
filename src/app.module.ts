@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailModule } from './ai/emails/email-intelligence.module';
 import { AppController } from './app.controller';
@@ -10,12 +11,14 @@ import { JobSearchCriteriaEntity } from './job-search-criteria/entities/job-sear
 import { JobSearchCriteriaModule } from './job-search-criteria/job-search-criteria.module';
 import { JobSearchEntity } from './job-search/entities/job-search.entity';
 import { JobSearchModule } from './job-search/job-search.module';
+import { GmailModule } from './gmail/gmail.module';
 import { MCPModule } from './mcp/mcp.module';
 import { UserEntity } from './users/entities/user.entity';
 import { UsersModule } from './users/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), // This makes ConfigModule available globally
+    ScheduleModule.forRoot(),
     UsersModule,
     EmailModule,
     JobSearchModule,
@@ -36,6 +39,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     ApplicationsModule,
     MCPModule,
+    GmailModule,
   ],
   controllers: [AppController],
   providers: [AppService]

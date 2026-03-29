@@ -10,7 +10,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientID: configService.get<string>('GOOGLE_CLIENT_ID'),
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
       callbackURL: configService.get<string>('GOOGLE_REDIRECT_URI'),
-      scope: ['email', 'profile'],
+      scope: ['email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'],
+      accessType: 'offline',
+      prompt: 'consent',
     });
   }
 
@@ -21,9 +23,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     done: VerifyCallback,
   ): Promise<any> {
     const user = {
+      googleId: profile.id,
       email: profile.emails[0].value,
-      name: profile.displayName,
+      firstName: profile.name?.givenName ?? '',
+      lastName: profile.name?.familyName ?? '',
       accessToken,
+      refreshToken,
     };
     done(null, user);
   }

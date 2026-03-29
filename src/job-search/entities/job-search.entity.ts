@@ -12,23 +12,26 @@ export class JobSearchEntity {
   @Column({ name: 'company_name' })
   companyName: string;
 
-  @Column({ name: 'company_location' })
-  companyLocation: string;
+  @Column({ name: 'company_location', nullable: true })
+  companyLocation: string | null;
 
-  @Column({ name: 'company_city' })
-  companyCity: string;
+  @Column({ name: 'company_city', nullable: true })
+  companyCity: string | null;
 
-  @Column({ name: 'position_type' })
-  positionType: string;
+  @Column({ name: 'position_type', nullable: true })
+  positionType: string | null;
 
-  @Column({ name: 'position_stack', type: 'text', array: true })
-  positionStack: string;
+  @Column({ name: 'position_stack', type: 'text', array: true, nullable: true })
+  positionStack: string[] | null;
 
-  @Column({ name: 'application_platform' })
-  applicationPlatform: string;
+  @Column({ name: 'application_platform', nullable: true })
+  applicationPlatform: string | null;
 
   @Column({ name: 'application_applied_date', type: 'date' })
   applicationDate: Date;
+
+  @Column({ name: 'is_auto_created', default: false })
+  isAutoCreated: boolean;
 
   @Column({ name: 'notes', nullable: true })
   notes: string;

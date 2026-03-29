@@ -1,4 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+
+export interface GoogleUserData {
+  googleId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
@@ -42,6 +49,69 @@ export class UserService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
     return user;
+  }
+
+  async findByGmailEmail(gmailEmail: string): Promise<UserEntity | null> {
+    return this.userRepository.findOne({ where: { gmailEmail } });
+  }
+
+  async updateGmailHistoryId(userId: number, historyId: string): Promise<void> {
+    await this.userRepository.update(userId, { gmailHistoryId: historyId });
+  }
+
+  async saveGmailWatchData(userId: number, historyId: string, gmailEmail: string): Promise<void> {
+    await this.userRepository.update(userId, { gmailHistoryId: historyId, gmailEmail });
+  }
+
+  async findUsersWithGmail(): Promise<UserEntity[]> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .where('user.gmailRefreshToken IS NOT NULL')
+      .select(['user.userId', 'user.gmailHistoryId', 'user.gmailEmail'])
+      .getMany();
+  }
+
+  async getGmailTokens(userId: number): Promise<Pick<UserEntity, 'gmailAccessToken' | 'gmailRefreshToken' | 'gmailTokenExpiry'> | null> {
+    return this.userRepository.findOne({
+      where: { userId },
+      select: ['gmailAccessToken', 'gmailRefreshToken', 'gmailTokenExpiry'],
+    });
+  }
+
+  async updateGmailAccessToken(userId: number, accessToken: string, expiry: Date): Promise<void> {
+    await this.userRepository.update(userId, { gmailAccessToken: accessToken, gmailTokenExpiry: expiry });
+  }
+
+  async saveGmailTokens(
+    userId: number,
+    accessToken: string,
+    refreshToken: string,
+    expiry: Date,
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      gmailAccessToken: accessToken,
+      gmailRefreshToken: refreshToken,
+      gmailTokenExpiry: expiry,
+    });
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserEntity | null> {
+    return this.userRepository.findOne({ where: { googleId } });
+  }
+
+  async createGoogleUser(data: GoogleUserData): Promise<UserEntity> {
+    const newUser = this.userRepository.create({
+      googleId: data.googleId,
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      password: '',
+    });
+    return this.userRepository.save(newUser);
+  }
+
+  async linkGoogleId(userId: number, googleId: string): Promise<void> {
+    await this.userRepository.update(userId, { googleId });
   }
 
   async createUser(userToAdd: CreateUserDto): Promise<NewUserDto> {

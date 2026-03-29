@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { GmailWatchService } from '../gmail/services/gmail-watch.service';
 import { TestingService } from '../temp/testing.service';
 import { UserEntity } from '../users/entities/user.entity';
 import { UserService } from '../users/users.service';
@@ -18,22 +19,47 @@ export class AuthService {
     private jwtService: JwtService,
     private readonly usersService: UserService,
     private configService: ConfigService,
-    private readonly testingService: TestingService
+    private readonly testingService: TestingService,
+    private readonly gmailWatchService: GmailWatchService,
   ) {
     // this.testingService.testProtectedRoute()
   }
 
-  //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING
-  async googleLogin(user: any) {
+  async googleLogin(googleUser: {
+    googleId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    accessToken: string;
+    refreshToken: string;
+  }): Promise<string> {
+    let user = await this.usersService.findByGoogleId(googleUser.googleId);
+
     if (!user) {
-      return 'No user from Google';
+      const existingByEmail = await this.usersService.findOneByEmail(googleUser.email);
+      if (existingByEmail) {
+        await this.usersService.linkGoogleId(existingByEmail.userId, googleUser.googleId);
+        user = existingByEmail;
+      } else {
+        user = await this.usersService.createGoogleUser({
+          googleId: googleUser.googleId,
+          email: googleUser.email,
+          firstName: googleUser.firstName,
+          lastName: googleUser.lastName,
+        });
+      }
     }
-    // Here you can add logic to save the use// Create a JWT token with user information
-    const payload = { email: user.email, name: user.name };
-    return {
-      accessToken: this.jwtService.sign(payload),
-      user,
-    };
+
+    const expiry = new Date(Date.now() + 3600 * 1000);
+    await this.usersService.saveGmailTokens(user.userId, googleUser.accessToken, googleUser.refreshToken, expiry);
+
+    try {
+      await this.gmailWatchService.registerWatch(user.userId, googleUser.email);
+    } catch {
+      // Non-fatal: watch registration can be retried by cron
+    }
+
+    return this.tokenGenerator({ userId: user.userId, email: user.email }).then((t) => t.auth_token);
   }
 
   // Validate user credentials

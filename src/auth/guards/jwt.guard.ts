@@ -5,7 +5,7 @@ import { LoginUserDto } from '../dto/user/login-user.dto';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {  
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'];
     const body = request.body as LoginUserDto;
