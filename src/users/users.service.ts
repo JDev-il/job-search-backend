@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
 export interface GoogleUserData {
   googleId: string;
@@ -115,6 +115,10 @@ export class UserService {
   }
 
   async createUser(userToAdd: CreateUserDto): Promise<NewUserDto> {
+    const existing = await this.userRepository.findOne({ where: { email: userToAdd.email } });
+    if (existing) {
+      throw new ConflictException('Email already in use');
+    }
     const hashedPassword = await bcrypt.hash(userToAdd.password, 10);
     const newUser = this.userRepository.create({
       ...userToAdd,
