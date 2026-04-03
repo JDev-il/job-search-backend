@@ -47,7 +47,7 @@ export class GmailProcessingService {
           await this.matchOrCreate(user.userId, companyName, result.intent, result.suggestedStatus);
         }
       } catch (err) {
-        this.logger.error(`Failed to process message ${messageId}: ${err.message}`);
+        this.logger.error(`Failed to process message ${messageId}: ${err}`);
       }
     }
 

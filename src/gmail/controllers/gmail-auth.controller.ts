@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
@@ -43,5 +43,20 @@ export class GmailAuthController {
     const { gmailEmail } = await this.gmailAuthService.exchangeCodeForTokens(dto.code, userId);
     await this.gmailWatchService.registerWatch(userId, gmailEmail);
     return res.redirect(`${this.frontendUrl}/settings?gmail=connected`);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('status')
+  async getStatus(@Req() req: Request): Promise<{ gmailEmail: string | null }> {
+    const userId = (req.user as { userId: number }).userId;
+    return this.gmailAuthService.getGmailStatus(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('disconnect')
+  @HttpCode(204)
+  async disconnect(@Req() req: Request): Promise<void> {
+    const userId = (req.user as { userId: number }).userId;
+    await this.gmailAuthService.disconnectGmail(userId);
   }
 }

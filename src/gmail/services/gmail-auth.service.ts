@@ -55,12 +55,8 @@ export class GmailAuthService {
 
     await this.userService.saveGmailTokens(userId, access_token, refresh_token, expiry);
 
-    const userinfoResponse = await firstValueFrom(
-      this.httpService.get<{ email: string }>('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }),
-    );
-    const gmailEmail = userinfoResponse.data.email;
+    const user = await this.userService.findOneById(userId);
+    const gmailEmail = user.email;
 
     this.logger.log(`Gmail tokens saved for user ${userId}, email=${gmailEmail}`);
     return { gmailEmail };
@@ -79,6 +75,26 @@ export class GmailAuthService {
     }
 
     return this.refreshAccessToken(userId, tokens.gmailRefreshToken);
+  }
+
+  public async getGmailStatus(userId: number): Promise<{ gmailEmail: string | null }> {
+    const tokens = await this.userService.getGmailTokens(userId);
+    return { gmailEmail: tokens?.gmailEmail ?? null };
+  }
+
+  public async disconnectGmail(userId: number): Promise<void> {
+    const tokens = await this.userService.getGmailTokens(userId);
+    if (tokens?.gmailAccessToken) {
+      try {
+        await firstValueFrom(
+          this.httpService.post(`https://oauth2.googleapis.com/revoke?token=${tokens.gmailAccessToken}`),
+        );
+      } catch {
+        this.logger.warn(`Failed to revoke Google token for user ${userId} — clearing DB anyway`);
+      }
+    }
+    await this.userService.clearGmailTokens(userId);
+    this.logger.log(`Gmail disconnected for user ${userId}`);
   }
 
   private async refreshAccessToken(userId: number, refreshToken: string): Promise<string> {

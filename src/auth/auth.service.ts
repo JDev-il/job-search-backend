@@ -65,6 +65,9 @@ export class AuthService {
   // Validate user credentials
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findOneByEmail(email); // Fetch user by email
+    if (user?.googleId && user.password === '') {
+      throw new UnauthorizedException('This account uses Google Sign-In. Please sign in with Google.');
+    }
     if (user && (await bcrypt.compare(password, user.password))) {
       // Password matches, return user details
       const { password, ...result } = user; // Exclude password from result

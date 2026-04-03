@@ -1,4 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
+import { Repository } from 'typeorm';
+import { CreateUserDto } from '../auth/dto/user/create-user.dto';
+import { NewUserDto } from '../auth/dto/user/login-user.dto';
+import { UserEntity } from './entities/user.entity';
 
 export interface GoogleUserData {
   googleId: string;
@@ -6,12 +12,6 @@ export interface GoogleUserData {
   firstName: string;
   lastName: string;
 }
-import { InjectRepository } from '@nestjs/typeorm';
-import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
-import { CreateUserDto } from '../auth/dto/user/create-user.dto';
-import { NewUserDto } from '../auth/dto/user/login-user.dto';
-import { UserEntity } from './entities/user.entity';
 
 @Injectable()
 export class UserService {
@@ -43,7 +43,7 @@ export class UserService {
   async findOneById(userId: number): Promise<UserEntity> {
     const user = await this.userRepository.findOne({
       where: { userId },
-      relations: ['job_search']
+      relations: ['jobSearchData']
     });
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
@@ -71,10 +71,10 @@ export class UserService {
       .getMany();
   }
 
-  async getGmailTokens(userId: number): Promise<Pick<UserEntity, 'gmailAccessToken' | 'gmailRefreshToken' | 'gmailTokenExpiry'> | null> {
+  async getGmailTokens(userId: number): Promise<Pick<UserEntity, 'gmailAccessToken' | 'gmailRefreshToken' | 'gmailTokenExpiry' | 'gmailEmail'> | null> {
     return this.userRepository.findOne({
       where: { userId },
-      select: ['gmailAccessToken', 'gmailRefreshToken', 'gmailTokenExpiry'],
+      select: ['gmailAccessToken', 'gmailRefreshToken', 'gmailTokenExpiry', 'gmailEmail'],
     });
   }
 
@@ -92,6 +92,16 @@ export class UserService {
       gmailAccessToken: accessToken,
       gmailRefreshToken: refreshToken,
       gmailTokenExpiry: expiry,
+    });
+  }
+
+  async clearGmailTokens(userId: number): Promise<void> {
+    await this.userRepository.update(userId, {
+      gmailAccessToken: null,
+      gmailRefreshToken: null,
+      gmailTokenExpiry: null,
+      gmailHistoryId: null,
+      gmailEmail: null,
     });
   }
 
