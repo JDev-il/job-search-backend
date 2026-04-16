@@ -1,7 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
-import { ParsedEmail } from '../../ai/emails/interfaces/email.interface';
+import { ParsedEmail } from '../../emails/interfaces/email.interface';
 import {
   GmailHistoryResponse,
   GmailMessageDetail,

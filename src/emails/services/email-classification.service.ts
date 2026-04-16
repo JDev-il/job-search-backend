@@ -89,6 +89,7 @@ export class EmailClassificationService {
     if (result.matchedRules.length === 0) return true; // No signal at all from the rule engine
     else if (result.intent === EmailIntent.UNKNOWN) return true; // Rule engine gave up on determining an intent
     else if (result.confidence < EMAIL_CLASSIFICATION_LLM_THRESHOLD) return true; // Confidence too low, competing signals or ambiguous content
+    else if (result.matchedRules.every(r => r.field === RuleField.SUBJECT)) return true; // Subject-only evidence is insufficient — rejection emails reuse confirmation subjects
     return false;
   }
 

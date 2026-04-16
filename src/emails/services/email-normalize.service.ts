@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { HelperService } from '../../../services/helper.service';
+import { HelperService } from '../../services/helper.service';
 import { NormalizedEmail, ParsedEmail } from './../interfaces/email.interface';
 
 @Injectable()

@@ -122,13 +122,62 @@ export const EMAIL_SIGNAL_RULES: EmailSignalRule[] = [
     weight: 8,
     strength: RuleStrength.STRONG,
   },
+  {
+    phrase: 'decided not to move forward',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 9,
+    strength: RuleStrength.STRONG,
+  },
+  {
+    phrase: 'not to move forward at this stage',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 9,
+    strength: RuleStrength.STRONG,
+  },
+  {
+    phrase: 'will not be moving forward at this stage',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 9,
+    strength: RuleStrength.STRONG,
+  },
+  {
+    phrase: 'after carefully reviewing your application',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 6,
+    strength: RuleStrength.MEDIUM,
+  },
+  {
+    phrase: 'after carefully reviewing',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 4,
+    strength: RuleStrength.MEDIUM,
+  },
+  {
+    phrase: 'based on our current needs',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 5,
+    strength: RuleStrength.MEDIUM,
+  },
+  {
+    phrase: 'made solely from the resume review',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 5,
+    strength: RuleStrength.MEDIUM,
+  },
 
   // ======================
   // REJECTION (BODY - SUPPORTING SIGNALS)
   // ======================
 
   {
-    phrase: 'thank you for your interest in',
+    phrase: 'for your interest in',
     intent: EmailIntent.REJECTION,
     field: RuleField.BODY,
     weight: 3,
@@ -143,6 +192,20 @@ export const EMAIL_SIGNAL_RULES: EmailSignalRule[] = [
   },
   {
     phrase: 'we wish you the best in your job search',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 4,
+    strength: RuleStrength.MEDIUM,
+  },
+  {
+    phrase: 'best of luck in your job search',
+    intent: EmailIntent.REJECTION,
+    field: RuleField.BODY,
+    weight: 4,
+    strength: RuleStrength.MEDIUM,
+  },
+  {
+    phrase: 'encourage you to apply again',
     intent: EmailIntent.REJECTION,
     field: RuleField.BODY,
     weight: 4,
