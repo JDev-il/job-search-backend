@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ApplicationStatus } from '../../../applications/enums/application-status.enum';
-import { OpenAIService } from '../../../mcp/openai/openai.service';
+import { ApplicationStatus } from '../../applications/enums/application-status.enum';
+import { OpenAIService } from '../../mcp/openai/openai.service';
 import { EmailIntent } from '../enums/email.enum';
 import { IRoleType, LLMClassificationResult, LLMRawEmailResponse, NormalizedEmail, RuleClassificationResult } from '../interfaces/email.interface';
 

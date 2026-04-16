@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ApplicationStatus } from '../../../applications/enums/application-status.enum';
+import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { EmailIntent } from '../enums/email.enum';
 import { TIntentToStatus } from '../interfaces/email.interface';
 

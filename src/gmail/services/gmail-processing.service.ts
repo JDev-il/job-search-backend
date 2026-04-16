@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EmailIntent } from '../../ai/emails/enums/email.enum';
-import { EmailClassificationService } from '../../ai/emails/services/email-classification.service';
 import { ApplicationStatus } from '../../applications/enums/application-status.enum';
+import { EmailIntent } from '../../emails/enums/email.enum';
+import { EmailClassificationService } from '../../emails/services/email-classification.service';
 import { JobSearchService } from '../../job-search/job-search.service';
 import { UserService } from '../../users/users.service';
 import { GmailApiService } from './gmail-api.service';

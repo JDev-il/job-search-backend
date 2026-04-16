@@ -1,7 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { EmailModule } from '../ai/emails/email-intelligence.module';
+import { EmailModule } from '../emails/email-intelligence.module';
 import { JobSearchModule } from '../job-search/job-search.module';
 import { UsersModule } from '../users/users.module';
 import { GmailAuthController } from './controllers/gmail-auth.controller';

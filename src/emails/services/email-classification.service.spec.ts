@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, it } from 'node:test';
-import { ApplicationStatus } from '../../../applications/enums/application-status.enum';
-import { HelperService } from '../../../services/helper.service';
+import { ApplicationStatus } from '../../applications/enums/application-status.enum';
+import { HelperService } from '../../services/helper.service';
 import { EmailIntent } from '../enums/email.enum';
 import { LLMClassificationResult } from '../interfaces/email.interface';
 import { EmailIntentMapper } from '../mapper/email-intent.mapper';

@@ -1,4 +1,4 @@
-import { ApplicationStatus } from '../../../applications/enums/application-status.enum';
+import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { EmailIntent, RuleField, RuleStrength } from '../enums/email.enum';
 
 // Scoring map used internally by the rule engine
