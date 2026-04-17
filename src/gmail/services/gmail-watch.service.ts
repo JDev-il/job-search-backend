@@ -25,17 +25,21 @@ export class GmailWatchService {
 
   async registerWatch(userId: number, gmailEmail: string): Promise<void> {
     const token = await this.gmailAuthService.getValidToken(userId);
-    const response = await firstValueFrom(
-      this.httpService.post<GmailWatchResponse>(
-        GMAIL_WATCH_URL,
-        { topicName: this.pubSubTopic, labelIds: ['INBOX'] },
-        { headers: { Authorization: `Bearer ${token}` } },
-      ),
-    );
-
-    const { historyId } = response.data;
-    await this.userService.saveGmailWatchData(userId, historyId, gmailEmail);
-    this.logger.log(`Watch registered for user ${userId} (${gmailEmail}), historyId=${historyId}`);
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<GmailWatchResponse>(
+          GMAIL_WATCH_URL,
+          { topicName: this.pubSubTopic, labelIds: ['INBOX'] },
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+      );
+      const { historyId } = response.data;
+      await this.userService.saveGmailWatchData(userId, historyId, gmailEmail);
+      this.logger.log(`Watch registered for user ${userId} (${gmailEmail}), historyId=${historyId}`);
+    }
+    catch {
+      this.logger.error(`Error registering to Gmail account for user: {id: ${userId}, email: ${gmailEmail}}`);
+    }
   }
 
   async renewWatch(userId: number): Promise<void> {

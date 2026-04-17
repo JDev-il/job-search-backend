@@ -51,7 +51,7 @@ export class AuthService {
     }
 
     const expiry = new Date(Date.now() + 3600 * 1000);
-    await this.usersService.saveGmailTokens(user.userId, googleUser.accessToken, googleUser.refreshToken, expiry);
+    await this.usersService.saveGmailTokens(user.userId, googleUser.accessToken, googleUser.refreshToken, expiry, googleUser.email);
 
     try {
       await this.gmailWatchService.registerWatch(user.userId, googleUser.email);

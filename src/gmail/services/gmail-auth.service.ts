@@ -3,26 +3,24 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../users/users.service';
-import { GmailTokenResponse } from '../interfaces/gmail.interface';
+import { GmailHelperService } from './gmail-helper.service';
 
 const GMAIL_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 @Injectable()
 export class GmailAuthService {
   private readonly logger = new Logger(GmailAuthService.name);
   private readonly clientId: string;
-  private readonly clientSecret: string;
   private readonly redirectUri: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly userService: UserService,
+    private readonly gmailHelperService: GmailHelperService
   ) {
     this.clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    this.clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
     this.redirectUri = this.configService.get<string>('GOOGLE_GMAIL_REDIRECT_URI');
   }
 
@@ -40,23 +38,15 @@ export class GmailAuthService {
   }
 
   public async exchangeCodeForTokens(code: string, userId: number): Promise<{ gmailEmail: string }> {
-    const response = await firstValueFrom(
-      this.httpService.post<GmailTokenResponse>(GMAIL_TOKEN_URL, {
-        code,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        redirect_uri: this.redirectUri,
-        grant_type: 'authorization_code',
-      }),
-    );
+    const response = await this.gmailHelperService.gmailToken(code);
 
     const { access_token, refresh_token, expires_in } = response.data;
     const expiry = new Date(Date.now() + expires_in * 1000);
 
-    await this.userService.saveGmailTokens(userId, access_token, refresh_token, expiry);
+    const profile = await this.gmailHelperService.gmailProfile(access_token);
+    const gmailEmail = profile.data.emailAddress;
 
-    const user = await this.userService.findOneById(userId);
-    const gmailEmail = user.email;
+    await this.userService.saveGmailTokens(userId, access_token, refresh_token, expiry, gmailEmail);
 
     this.logger.log(`Gmail tokens saved for user ${userId}, email=${gmailEmail}`);
     return { gmailEmail };
@@ -98,14 +88,7 @@ export class GmailAuthService {
   }
 
   private async refreshAccessToken(userId: number, refreshToken: string): Promise<string> {
-    const response = await firstValueFrom(
-      this.httpService.post<GmailTokenResponse>(GMAIL_TOKEN_URL, {
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      }),
-    );
+    const response = await this.gmailHelperService.gmailRefreshAccessToken(refreshToken);
 
     const { access_token, expires_in } = response.data;
     const expiry = new Date(Date.now() + expires_in * 1000);
