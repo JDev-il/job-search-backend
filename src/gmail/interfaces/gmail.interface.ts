@@ -1,3 +1,9 @@
+
+interface GmailMessageBody {
+  data?: string;
+  size: number;
+}
+
 export interface GmailTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -65,9 +71,4 @@ export interface GmailHistoryResponse {
 export interface GmailWatchResponse {
   historyId: string;
   expiration: string;
-}
-
-interface GmailMessageBody {
-  data?: string;
-  size: number;
 }

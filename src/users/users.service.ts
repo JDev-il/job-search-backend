@@ -87,11 +87,13 @@ export class UserService {
     accessToken: string,
     refreshToken: string,
     expiry: Date,
+    gmailEmail: string,
   ): Promise<void> {
     await this.userRepository.update(userId, {
       gmailAccessToken: accessToken,
       gmailRefreshToken: refreshToken,
       gmailTokenExpiry: expiry,
+      gmailEmail,
     });
   }
 

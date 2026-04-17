@@ -1,6 +1,5 @@
-import { Controller, Delete, Get, HttpCode, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
+import { Controller, Delete, Get, Header, HttpCode, Query, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { GmailCallbackDto } from '../dto/gmail-callback.dto';
 import { GmailAuthService } from '../services/gmail-auth.service';
@@ -8,19 +7,14 @@ import { GmailWatchService } from '../services/gmail-watch.service';
 
 @Controller('auth/gmail')
 export class GmailAuthController {
-  private readonly frontendUrl: string;
-
   constructor(
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailWatchService: GmailWatchService,
-    private readonly configService: ConfigService,
-  ) {
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL');
-  }
+  ) {}
 
   /**
    * Step 1: frontend calls this (with Bearer token) to get the OAuth URL,
-   * then navigates to it via window.location.href.
+   * then opens it in a popup window.
    */
   @UseGuards(JwtAuthGuard)
   @Get('url')
@@ -31,18 +25,21 @@ export class GmailAuthController {
 
   /**
    * Step 2: Google redirects here with a one-time `code` and the `state`
-   * we set in step 1. Exchange the code for tokens and redirect the user
-   * back to the frontend.
+   * we set in step 1. Exchange the code for tokens and return an HTML page
+   * that notifies the parent window and closes itself.
    */
   @Get('callback')
+  @Header('Content-Type', 'text/html')
   async handleCallback(
     @Query() dto: GmailCallbackDto,
-    @Res() res: Response,
-  ) {
+  ): Promise<string> {
     const userId = Number(dto.state);
     const { gmailEmail } = await this.gmailAuthService.exchangeCodeForTokens(dto.code, userId);
     await this.gmailWatchService.registerWatch(userId, gmailEmail);
-    return res.redirect(`${this.frontendUrl}/settings?gmail=connected`);
+    return `<html><body><script>
+      window.opener.postMessage({ type: 'gmail-connected', email: '${gmailEmail}' }, '*');
+      window.close();
+    </script></body></html>`;
   }
 
   @UseGuards(JwtAuthGuard)

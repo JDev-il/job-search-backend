@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { HelperService } from '../../services/helper.service.js';
 import { EMAIL_SIGNAL_RULES } from '../constants/email-signal-rules.ts';
 import { EmailIntent, RuleField } from '../enums/email.enum';
 import {
@@ -24,6 +25,7 @@ export class EmailClassificationService {
     private readonly normalizerService: EmailNormalizerService,
     private readonly llmService: EmailLLMClassificationService,
     private readonly mapper: EmailIntentMapper,
+    private readonly helperService: HelperService
   ) { }
 
   public async classify(email: ParsedEmail): Promise<EmailClassificationResult> {
@@ -63,17 +65,10 @@ export class EmailClassificationService {
   // Email Rule engine
   private runRules(email: NormalizedEmail): RuleClassificationResult {
     const matchedRules: EmailSignalRule[] = [];
-    const scores: IntentSignalRule = {
-      [EmailIntent.CONFIRMATION]: 0,
-      [EmailIntent.REJECTION]: 0,
-      [EmailIntent.INTERVIEW]: 0,
-      [EmailIntent.ASSESSMENT]: 0,
-      [EmailIntent.FOLLOW_UP]: 0,
-      [EmailIntent.UNKNOWN]: 0,
-    };
+    const scores: IntentSignalRule = this.helperService.getEmailScores();
 
     for (const rule of EMAIL_SIGNAL_RULES) {
-      const text = this.getFieldText(email, rule.field);
+      const text = this.helperService.getFieldText(email, rule.field);
       if (text.includes(rule.phrase)) {
         scores[rule.intent] += rule.weight;
         matchedRules.push(rule);
@@ -91,20 +86,6 @@ export class EmailClassificationService {
     else if (result.confidence < EMAIL_CLASSIFICATION_LLM_THRESHOLD) return true; // Confidence too low, competing signals or ambiguous content
     else if (result.matchedRules.every(r => r.field === RuleField.SUBJECT)) return true; // Subject-only evidence is insufficient — rejection emails reuse confirmation subjects
     return false;
-  }
-
-  // Scoring helpers
-  private getFieldText(email: NormalizedEmail, field: RuleField): string {
-    switch (field) {
-      case RuleField.SUBJECT:
-        return email.subject;
-      case RuleField.BODY:
-        return email.bodyText;
-      case RuleField.BODY_CLEANED:
-        return email.bodyCleaned ?? '';
-      default:
-        return '';
-    }
   }
 
   private resolveRule(scores: IntentSignalRule): ISignalRule {

@@ -1,3 +1,4 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -28,6 +29,7 @@ import { LocalStrategy } from './strategies/local.strategy';
     }),
     TypeOrmModule.forFeature([UserEntity]),
     GmailModule,
+    HttpModule,
   ],
   providers: [AuthService, ProtectedService, TestingService, UserService, HelperService, JwtStrategy, LocalStrategy, GoogleStrategy],
   controllers: [AuthController, ProtectedController],
