@@ -14,4 +14,18 @@ export enum ApplicationStatus {
   REAPPLIED = 'Reapplied',
   ARCHIVED = 'Archived',
   RECEIVED_CONTRACT = 'Received a contract',
+  CONTRACT_ACCEPTED = 'Accepted offer',
+  CONTRACT_DECLINED = 'Declined offer',
 }
+
+export const TERMINAL_STATUSES: ReadonlySet<ApplicationStatus> = new Set([
+  ApplicationStatus.DECIDED_TO_PASS,
+  ApplicationStatus.LOW_SALARY,
+  ApplicationStatus.DID_NOT_PASS_HR,
+  ApplicationStatus.REJECTED,
+  ApplicationStatus.PASSED,
+  ApplicationStatus.PROBABLY_NOT,
+  ApplicationStatus.ARCHIVED,
+  ApplicationStatus.CONTRACT_ACCEPTED,
+  ApplicationStatus.CONTRACT_DECLINED,
+]);

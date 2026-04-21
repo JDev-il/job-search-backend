@@ -2,11 +2,10 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { GOOGLE_AUTH_URL, GOOGLE_REVOKE_URL } from '../../auth/constants';
 import { UserService } from '../../users/users.service';
+import { GMAIL_URLS } from '../constants/urls';
 import { GmailHelperService } from './gmail-helper.service';
-
-const GMAIL_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 @Injectable()
 export class GmailAuthService {
@@ -29,20 +28,18 @@ export class GmailAuthService {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: GMAIL_SCOPE,
+      scope: GMAIL_URLS.SCOPE,
       access_type: 'offline',
       prompt: 'consent', // ensures refresh_token is always returned
       state: String(userId),
     });
-    return `${GMAIL_AUTH_URL}?${params.toString()}`;
+    return `${GOOGLE_AUTH_URL}?${params.toString()}`;
   }
 
   public async exchangeCodeForTokens(code: string, userId: number): Promise<{ gmailEmail: string }> {
     const response = await this.gmailHelperService.gmailToken(code);
-
     const { access_token, refresh_token, expires_in } = response.data;
     const expiry = new Date(Date.now() + expires_in * 1000);
-
     const profile = await this.gmailHelperService.gmailProfile(access_token);
     const gmailEmail = profile.data.emailAddress;
 
@@ -77,7 +74,7 @@ export class GmailAuthService {
     if (tokens?.gmailAccessToken) {
       try {
         await firstValueFrom(
-          this.httpService.post(`https://oauth2.googleapis.com/revoke?token=${tokens.gmailAccessToken}`),
+          this.httpService.post(`${GOOGLE_REVOKE_URL}?token=${tokens.gmailAccessToken}`),
         );
       } catch {
         this.logger.warn(`Failed to revoke Google token for user ${userId} — clearing DB anyway`);
