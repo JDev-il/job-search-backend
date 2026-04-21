@@ -3,11 +3,9 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosResponse } from "axios";
 import { firstValueFrom } from "rxjs";
+import { GOOGLE_TOKEN_URL } from "../../auth/constants";
+import { GMAIL_URLS } from "../constants/urls";
 import { GmailTokenResponse } from "../interfaces/gmail.interface";
-
-const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GMAIL_PROFILE_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/profile';
-
 @Injectable()
 export class GmailHelperService {
   private readonly clientId: string;
@@ -25,7 +23,7 @@ export class GmailHelperService {
 
   async gmailProfile(access_token: string): Promise<AxiosResponse> {
     return await firstValueFrom(
-      this.httpService.get<{ emailAddress: string }>(GMAIL_PROFILE_URL, {
+      this.httpService.get<{ emailAddress: string }>(GMAIL_URLS.PROFILE, {
         headers: { Authorization: `Bearer ${access_token}` },
       }),
     )
@@ -33,7 +31,7 @@ export class GmailHelperService {
 
   async gmailToken(code: string): Promise<AxiosResponse> {
     return await firstValueFrom(
-      this.httpService.post<GmailTokenResponse>(GMAIL_TOKEN_URL, {
+      this.httpService.post<GmailTokenResponse>(GOOGLE_TOKEN_URL, {
         code,
         client_id: this.clientId,
         client_secret: this.clientSecret,
@@ -45,7 +43,7 @@ export class GmailHelperService {
 
   async gmailRefreshAccessToken(refreshToken: string): Promise<AxiosResponse> {
     return await firstValueFrom(
-      this.httpService.post<GmailTokenResponse>(GMAIL_TOKEN_URL, {
+      this.httpService.post<GmailTokenResponse>(GOOGLE_TOKEN_URL, {
         client_id: this.clientId,
         client_secret: this.clientSecret,
         refresh_token: refreshToken,
@@ -53,5 +51,4 @@ export class GmailHelperService {
       }),
     );
   }
-
 }

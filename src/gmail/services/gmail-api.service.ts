@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { ParsedEmail } from '../../emails/interfaces/email.interface';
+import { GMAIL_URLS } from '../constants/urls';
 import {
   GmailHistoryResponse,
   GmailMessageDetail,
@@ -10,9 +11,6 @@ import {
   GmailMessagePart,
 } from '../interfaces/gmail.interface';
 import { GmailAuthService } from './gmail-auth.service';
-
-const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
-
 @Injectable()
 export class GmailApiService {
   private readonly logger = new Logger(GmailApiService.name);
@@ -25,7 +23,7 @@ export class GmailApiService {
   async getNewMessageIds(userId: number, startHistoryId: string): Promise<string[]> {
     const token = await this.gmailAuthService.getValidToken(userId);
     const response = await firstValueFrom(
-      this.httpService.get<GmailHistoryResponse>(`${GMAIL_API_BASE}/history`, {
+      this.httpService.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { startHistoryId, historyTypes: 'messageAdded', labelId: 'INBOX' },
       }),
@@ -42,7 +40,7 @@ export class GmailApiService {
   async listUnreadMessageIds(userId: number): Promise<string[]> {
     const token = await this.gmailAuthService.getValidToken(userId);
     const response = await firstValueFrom(
-      this.httpService.get<GmailMessageListResponse>(`${GMAIL_API_BASE}/messages`, {
+      this.httpService.get<GmailMessageListResponse>(`${GMAIL_URLS.API_BASE}/messages`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { q: 'is:unread', maxResults: 20 },
       }),
@@ -56,7 +54,7 @@ export class GmailApiService {
   async fetchMessage(userId: number, messageId: string): Promise<ParsedEmail> {
     const token = await this.gmailAuthService.getValidToken(userId);
     const response = await firstValueFrom(
-      this.httpService.get<GmailMessageDetail>(`${GMAIL_API_BASE}/messages/${messageId}`, {
+      this.httpService.get<GmailMessageDetail>(`${GMAIL_URLS.MESSAGES}/${messageId}`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { format: 'full' },
       }),

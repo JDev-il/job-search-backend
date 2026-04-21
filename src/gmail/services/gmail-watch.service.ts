@@ -4,11 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../users/users.service';
+import { GMAIL_URLS } from '../constants/urls';
 import { GmailWatchResponse } from '../interfaces/gmail.interface';
 import { GmailAuthService } from './gmail-auth.service';
-
-const GMAIL_WATCH_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/watch';
-
 @Injectable()
 export class GmailWatchService {
   private readonly logger = new Logger(GmailWatchService.name);
@@ -28,7 +26,7 @@ export class GmailWatchService {
     try {
       const response = await firstValueFrom(
         this.httpService.post<GmailWatchResponse>(
-          GMAIL_WATCH_URL,
+          GMAIL_URLS.WATCH,
           { topicName: this.pubSubTopic, labelIds: ['INBOX'] },
           { headers: { Authorization: `Bearer ${token}` } },
         ),

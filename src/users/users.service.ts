@@ -82,13 +82,7 @@ export class UserService {
     await this.userRepository.update(userId, { gmailAccessToken: accessToken, gmailTokenExpiry: expiry });
   }
 
-  async saveGmailTokens(
-    userId: number,
-    accessToken: string,
-    refreshToken: string,
-    expiry: Date,
-    gmailEmail: string,
-  ): Promise<void> {
+  async saveGmailTokens(userId: number, accessToken: string, refreshToken: string, expiry: Date, gmailEmail: string,): Promise<void> {
     await this.userRepository.update(userId, {
       gmailAccessToken: accessToken,
       gmailRefreshToken: refreshToken,

@@ -5,5 +5,5 @@ export class GmailCallbackDto {
   code: string;
 
   @IsString()
-  state: string; // encodes userId passed through the OAuth round-trip
+  state: string;
 }
