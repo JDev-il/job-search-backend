@@ -67,13 +67,16 @@ export class GmailApiService {
     const headers = detail.payload.headers ?? [];
     const subject = this.getHeader(headers, 'Subject') ?? '(no subject)';
     const from = this.getHeader(headers, 'From') ?? '';
-    const { sender, senderDomain } = this.parseSender(from);
+    const { sender, senderDisplayName, senderDomain } = this.parseSender(from);
     const bodyText = this.extractBody(detail.payload);
     return {
+      messageId: detail.id,
+      threadId: detail.threadId,
       subject,
       bodyText,
       snippet: detail.snippet,
       sender,
+      senderDisplayName,
       senderDomain,
     };
   }
@@ -82,13 +85,22 @@ export class GmailApiService {
     return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
   }
 
-  private parseSender(from: string): { sender: string; senderDomain?: string } {
+  private parseSender(from: string): { sender: string; senderDisplayName?: string; senderDomain?: string } {
     // "Display Name <email@domain.com>" or just "email@domain.com"
-    const match = from.match(/<(.+)>/) ?? from.match(/(\S+@\S+)/);
-    const email = match?.[1] ?? from;
+    const angleMatch = from.match(/^\s*"?([^"<]*?)"?\s*<(.+)>\s*$/);
+    let email: string;
+    let senderDisplayName: string | undefined;
+    if (angleMatch) {
+      senderDisplayName = angleMatch[1].trim() || undefined;
+      email = angleMatch[2];
+    } else {
+      const bare = from.match(/(\S+@\S+)/);
+      email = bare?.[1] ?? from;
+    }
     const domainMatch = email.match(/@(.+)$/);
     return {
       sender: email.trim(),
+      senderDisplayName,
       senderDomain: domainMatch?.[1],
     };
   }

@@ -33,6 +33,9 @@ export class JobSearchEntity {
   @Column({ name: 'is_auto_created', default: false })
   isAutoCreated: boolean;
 
+  @Column({ name: 'gmail_thread_id', nullable: true })
+  gmailThreadId: string | null;
+
   @Column({ name: 'notes', nullable: true })
   notes: string;
 

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { JobSearchCriteriaEntity } from './job-search-criteria/entities/job-search-criteria.entity';
 import { JobSearchEntity } from './job-search/entities/job-search.entity';
+import { PendingActionEntity } from './pending-actions/entities/pending-action.entity';
 import { UserEntity } from './users/entities/user.entity';
 
 export const AppDataSource = new DataSource({
@@ -11,7 +12,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity],
+  entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity, PendingActionEntity],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
 });

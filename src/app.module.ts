@@ -13,6 +13,8 @@ import { JobSearchCriteriaModule } from './job-search-criteria/job-search-criter
 import { JobSearchEntity } from './job-search/entities/job-search.entity';
 import { JobSearchModule } from './job-search/job-search.module';
 import { MCPModule } from './mcp/mcp.module';
+import { PendingActionEntity } from './pending-actions/entities/pending-action.entity';
+import { PendingActionsModule } from './pending-actions/pending-actions.module';
 import { UserEntity } from './users/entities/user.entity';
 import { UsersModule } from './users/users.module';
 @Module({
@@ -32,13 +34,14 @@ import { UsersModule } from './users/users.module';
         username: configService.get<string>('DB_USER'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity],
+        entities: [UserEntity, JobSearchEntity, JobSearchCriteriaEntity, PendingActionEntity],
         synchronize: false  // Set to false in production
       }),
     }),
     AuthModule,
     ApplicationsModule,
     MCPModule,
+    PendingActionsModule,
     GmailModule,
   ],
   controllers: [AppController],

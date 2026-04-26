@@ -1,10 +1,37 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { EmailIntent } from '../../emails/enums/email.enum';
+import { EmailClassificationResult, ParsedEmail } from '../../emails/interfaces/email.interface';
 import { EmailClassificationService } from '../../emails/services/email-classification.service';
+import { JobSearchEntity } from '../../job-search/entities/job-search.entity';
 import { JobSearchService } from '../../job-search/job-search.service';
+import { PendingActionType } from '../../pending-actions/enums/pending-action.enum';
+import {
+  PendingActionEvidence,
+  PendingActionProposedChange,
+} from '../../pending-actions/interfaces/pending-action.interface';
+import { PendingActionsService } from '../../pending-actions/services/pending-actions.service';
 import { UserService } from '../../users/users.service';
 import { GmailApiService } from './gmail-api.service';
+
+/**
+ * ATS platforms whose noreply domains carry no useful company signal — the
+ * employer name is in the From display-name or Subject. These domains
+ * always route to LINK_THREAD_TO_APPLICATION (with candidates) instead of
+ * a fuzzy match against the domain stub.
+ */
+const ATS_DOMAINS: readonly string[] = [
+  'workday.com',
+  'myworkday.com',
+  'myworkdayjobs.com',
+  'greenhouse.io',
+  'grnh.se',
+  'lever.co',
+  'ashbyhq.com',
+  'smartrecruiters.com',
+  'jobvite.com',
+  'icims.com',
+];
 
 @Injectable()
 export class GmailProcessingService {
@@ -15,7 +42,8 @@ export class GmailProcessingService {
     private readonly gmailApiService: GmailApiService,
     private readonly classificationService: EmailClassificationService,
     private readonly jobSearchService: JobSearchService,
-  ) {}
+    private readonly pendingActionsService: PendingActionsService,
+  ) { }
 
   async processNotification(emailAddress: string, newHistoryId: string): Promise<void> {
     const user = await this.userService.findByGmailEmail(emailAddress);
@@ -43,8 +71,7 @@ export class GmailProcessingService {
         );
 
         if (result.suggestedStatus && parsedEmail.senderDomain) {
-          const companyName = this.extractCompanyName(parsedEmail.senderDomain);
-          await this.matchOrCreate(user.userId, companyName, result.intent, result.suggestedStatus);
+          await this.routeClassifiedEmail(user.userId, parsedEmail, result);
         }
       } catch (err) {
         this.logger.error(`Failed to process message ${messageId}: ${err}`);
@@ -54,45 +81,212 @@ export class GmailProcessingService {
     await this.userService.updateGmailHistoryId(user.userId, newHistoryId);
   }
 
-  private async matchOrCreate(
+  /**
+   * Routing rules:
+   *  - rules-source classifications with a match → auto-apply (keeps current behavior).
+   *  - LLM-source classifications → emit STATUS_CHANGE pending action.
+   *  - ATS-domain sender, regardless of source → emit LINK_THREAD_TO_APPLICATION
+   *    with a candidate set, since the domain stub ("workday") gives no signal.
+   *  - No match + intent=CONFIRMATION → emit AUTO_CREATE_APPLICATION.
+   *  - No match + intent≠CONFIRMATION + plausible company → emit LINK_THREAD_TO_APPLICATION.
+   *  - No match + nothing actionable → skip silently (existing behavior).
+   */
+  private async routeClassifiedEmail(
     userId: number,
-    companyName: string,
-    intent: EmailIntent,
-    suggestedStatus: ApplicationStatus,
+    email: ParsedEmail,
+    result: EmailClassificationResult,
   ): Promise<void> {
-    const existing = await this.jobSearchService.findMatchingApplication(userId, companyName);
+    const senderDomain = email.senderDomain!;
+    const suggestedStatus = result.suggestedStatus!;
+    const isAts = this.isAtsDomain(senderDomain);
 
-    if (existing) {
-      await this.jobSearchService.updateApplication({
-        jobId: existing.jobId,
-        userId,
-        status: suggestedStatus,
-        companyName: existing.companyName,
-        companyLocation: existing.companyLocation,
-        companyCity: existing.companyCity,
-        positionType: existing.positionType,
-        positionStack: existing.positionStack ?? [],
-        applicationPlatform: existing.applicationPlatform,
-        applicationDate: existing.applicationDate,
-        notes: existing.notes,
-        hunch: existing.hunch,
-      });
-      this.logger.log(`Updated job ${existing.jobId} (${existing.companyName}) → ${suggestedStatus}`);
+    // Thread-based fast path: a previous accept already linked this thread.
+    if (email.threadId) {
+      const linked = await this.jobSearchService.findByThreadId(userId, email.threadId);
+      if (linked) {
+        await this.proposeOrApplyStatusChange(userId, email, result, linked, /*forceQueue*/ false);
+        return;
+      }
+    }
+
+    if (isAts) {
+      await this.emitLinkThreadAction(userId, email, result);
       return;
     }
 
-    if (intent === EmailIntent.CONFIRMATION) {
-      const created = await this.jobSearchService.createAutoApplication(userId, companyName, suggestedStatus);
-      this.logger.log(`Auto-created job ${created.jobId} for company "${companyName}" → ${suggestedStatus}`);
-    } else {
-      this.logger.log(`No match for "${companyName}" and intent is ${intent} — skipping`);
+    const companyName = this.extractCompanyName(senderDomain);
+    const existing = await this.jobSearchService.findMatchingApplication(userId, companyName);
+
+    if (existing) {
+      // Force queue when LLM was the source — we don't auto-apply lower-confidence calls.
+      const forceQueue = result.source === 'llm';
+      await this.proposeOrApplyStatusChange(userId, email, result, existing, forceQueue);
+      return;
     }
+
+    if (result.intent === EmailIntent.CONFIRMATION) {
+      await this.emitAutoCreateAction(userId, email, result, companyName);
+      return;
+    }
+
+    if (companyName) {
+      await this.emitLinkThreadAction(userId, email, result, companyName);
+      return;
+    }
+
+    this.logger.log(
+      `No match for "${companyName}" and intent is ${result.intent} — skipping`,
+    );
+  }
+
+  private async proposeOrApplyStatusChange(
+    userId: number,
+    email: ParsedEmail,
+    result: EmailClassificationResult,
+    target: JobSearchEntity,
+    forceQueue: boolean,
+  ): Promise<void> {
+    const suggestedStatus = result.suggestedStatus!;
+
+    if (!forceQueue && result.source === 'rules') {
+      // Rules path: status came from the deterministic INTENT_TO_STATUS table —
+      // valid by construction. Auto-apply.
+      await this.jobSearchService.setStatus(userId, target.jobId, suggestedStatus);
+      this.logger.log(
+        `Auto-applied job ${target.jobId} (${target.companyName}) → ${suggestedStatus}`,
+      );
+      return;
+    }
+
+    // Queue for user confirmation.
+    const evidence = this.buildEvidence(email, result);
+    const proposed: PendingActionProposedChange = {
+      kind: 'STATUS_CHANGE',
+      jobId: target.jobId,
+      fromStatus: target.status,
+      toStatus: suggestedStatus,
+      intent: result.intent,
+    };
+    await this.pendingActionsService.create({
+      userId,
+      jobId: target.jobId,
+      type: PendingActionType.STATUS_CHANGE,
+      evidence,
+      proposedChange: proposed,
+      question: `Mark "${target.companyName}" as ${suggestedStatus}?`,
+      gmailMessageId: email.messageId,
+    });
+  }
+
+  private async emitAutoCreateAction(
+    userId: number,
+    email: ParsedEmail,
+    result: EmailClassificationResult,
+    companyName: string,
+  ): Promise<void> {
+    const evidence = this.buildEvidence(email, result, { extractedCompanyName: companyName });
+    const proposed: PendingActionProposedChange = {
+      kind: 'AUTO_CREATE_APPLICATION',
+      companyName,
+      status: result.suggestedStatus!,
+      intent: result.intent,
+      threadId: email.threadId,
+    };
+    await this.pendingActionsService.create({
+      userId,
+      type: PendingActionType.AUTO_CREATE_APPLICATION,
+      evidence,
+      proposedChange: proposed,
+      question: `Add a new application for "${companyName}" (${result.suggestedStatus})?`,
+      gmailMessageId: email.messageId,
+    });
+  }
+
+  private async emitLinkThreadAction(
+    userId: number,
+    email: ParsedEmail,
+    result: EmailClassificationResult,
+    fallbackCompanyName?: string,
+  ): Promise<void> {
+    if (!email.threadId) {
+      this.logger.debug(
+        `[${email.messageId}] no threadId — cannot emit LINK_THREAD_TO_APPLICATION`,
+      );
+      return;
+    }
+    const candidates = await this.jobSearchService.findLinkCandidates(
+      userId,
+      {
+        companyName: fallbackCompanyName,
+        senderDisplayName: email.senderDisplayName,
+        subject: email.subject,
+      },
+      5,
+    );
+    if (candidates.length === 0) {
+      this.logger.log(
+        `[${email.messageId}] no candidate applications to link — skipping`,
+      );
+      return;
+    }
+    const evidence = this.buildEvidence(email, result, {
+      isAtsDomain: this.isAtsDomain(email.senderDomain ?? ''),
+      extractedCompanyName: fallbackCompanyName,
+      candidates: candidates.map(c => ({
+        jobId: c.jobId,
+        companyName: c.companyName,
+        status: c.status,
+        applicationDate: c.applicationDate,
+      })),
+    });
+    const intentValid = result.suggestedStatus !== undefined;
+    const proposed: PendingActionProposedChange = {
+      kind: 'LINK_THREAD_TO_APPLICATION',
+      threadId: email.threadId,
+      intent: result.intent,
+      toStatus: intentValid ? result.suggestedStatus : undefined,
+    };
+    const hint = email.senderDisplayName ?? fallbackCompanyName ?? email.senderDomain ?? 'this thread';
+    await this.pendingActionsService.create({
+      userId,
+      type: PendingActionType.LINK_THREAD_TO_APPLICATION,
+      evidence,
+      proposedChange: proposed,
+      question: `Which application does this email from "${hint}" belong to?`,
+      gmailMessageId: email.messageId,
+    });
+  }
+
+  private buildEvidence(
+    email: ParsedEmail,
+    result: EmailClassificationResult,
+    extra: Partial<PendingActionEvidence> = {},
+  ): PendingActionEvidence {
+    return {
+      gmailMessageId: email.messageId,
+      gmailThreadId: email.threadId,
+      senderDomain: email.senderDomain,
+      senderDisplayName: email.senderDisplayName,
+      subject: email.subject,
+      snippet: email.snippet?.slice(0, 240),
+      classification: {
+        intent: result.intent,
+        confidence: result.confidence,
+        source: result.source,
+        reasoning: result.reasoning,
+      },
+      ...extra,
+    };
+  }
+
+  private isAtsDomain(domain: string): boolean {
+    const lower = domain.toLowerCase();
+    return ATS_DOMAINS.some(ats => lower === ats || lower.endsWith(`.${ats}`));
   }
 
   /** amazon.co.uk → amazon, mail.google.com → google */
   private extractCompanyName(domain: string): string {
     const parts = domain.split('.');
-    // drop TLD(s) — take the last meaningful segment before the TLD
     return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
   }
 }
