@@ -8,10 +8,13 @@ export type EmailIntentSource = 'rules' | 'llm' | 'cache';
 
 // Email data shapes
 export interface ParsedEmail {
+  messageId?: string;
+  threadId?: string;
   subject: string;
   bodyText: string;
   snippet?: string;
   sender: string;
+  senderDisplayName?: string;
   senderDomain?: string;
 }
 

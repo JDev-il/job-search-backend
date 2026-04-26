@@ -98,15 +98,113 @@ export class JobSearchService {
       .getOne();
   }
 
-  async createAutoApplication(userId: number, companyName: string, status: ApplicationStatus): Promise<JobSearchEntity> {
+  async createAutoApplication(
+    userId: number,
+    companyName: string,
+    status: ApplicationStatus,
+    gmailThreadId?: string,
+  ): Promise<JobSearchEntity> {
     const application = this.jobSearchRepository.create({
       companyName,
       status,
       applicationDate: new Date(),
       isAutoCreated: true,
+      gmailThreadId: gmailThreadId ?? null,
       user: { userId },
     });
     return this.jobSearchRepository.save(application);
+  }
+
+  async findByThreadId(userId: number, gmailThreadId: string): Promise<JobSearchEntity | null> {
+    return this.jobSearchRepository
+      .createQueryBuilder('js')
+      .where('js.user_id = :userId', { userId })
+      .andWhere('js.gmail_thread_id = :threadId', { threadId: gmailThreadId })
+      .getOne();
+  }
+
+  async findById(userId: number, jobId: number): Promise<JobSearchEntity | null> {
+    return this.jobSearchRepository.findOne({
+      where: { jobId, user: { userId } },
+      relations: ['user'],
+    });
+  }
+
+  async setThreadId(userId: number, jobId: number, gmailThreadId: string): Promise<void> {
+    await this.jobSearchRepository
+      .createQueryBuilder()
+      .update(JobSearchEntity)
+      .set({ gmailThreadId })
+      .where('job_id = :jobId AND user_id = :userId', { jobId, userId })
+      .execute();
+  }
+
+  async setStatus(userId: number, jobId: number, status: ApplicationStatus): Promise<JobSearchEntity> {
+    const application = await this.jobSearchRepository.findOne({
+      where: { jobId, user: { userId } },
+      relations: ['user'],
+    });
+    if (!application) {
+      throw new NotFoundException('Application not found or you do not have permission to update it');
+    }
+    application.status = status;
+    return this.jobSearchRepository.save(application);
+  }
+
+  /**
+   * Recency-weighted candidates for LINK_THREAD_TO_APPLICATION. Returns up to
+   * `limit` non-terminal applications ranked by token overlap against hints
+   * (companyName, displayName, subject) plus a recency bonus.
+   */
+  async findLinkCandidates(
+    userId: number,
+    hints: { companyName?: string; senderDisplayName?: string; subject?: string },
+    limit = 5,
+  ): Promise<JobSearchEntity[]> {
+    const apps = await this.jobSearchRepository
+      .createQueryBuilder('js')
+      .where('js.user_id = :userId', { userId })
+      .andWhere('js.status NOT IN (:...excluded)', {
+        excluded: [
+          ApplicationStatus.REJECTED,
+          ApplicationStatus.ARCHIVED,
+          ApplicationStatus.CONTRACT_DECLINED,
+          ApplicationStatus.CONTRACT_ACCEPTED,
+          ApplicationStatus.DECIDED_TO_PASS,
+          ApplicationStatus.LOW_SALARY,
+          ApplicationStatus.DID_NOT_PASS_HR,
+          ApplicationStatus.PROBABLY_NOT,
+          ApplicationStatus.PASSED,
+        ],
+      })
+      .orderBy('js.application_applied_date', 'DESC')
+      .limit(50)
+      .getMany();
+
+    const tokens = new Set(
+      [hints.companyName, hints.senderDisplayName, hints.subject]
+        .filter((s): s is string => !!s)
+        .flatMap(s => s.toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 3)),
+    );
+
+    const now = Date.now();
+    const scored = apps.map(app => {
+      const target = `${app.companyName ?? ''}`.toLowerCase();
+      let overlap = 0;
+      for (const t of tokens) {
+        if (target.includes(t)) overlap += 1;
+      }
+      const ageDays = app.applicationDate
+        ? (now - new Date(app.applicationDate).getTime()) / (1000 * 60 * 60 * 24)
+        : 365;
+      const recency = Math.max(0, 1 - ageDays / 90);
+      return { app, score: overlap * 2 + recency };
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(s => s.app);
   }
 
   async removeApplicationRows(applications: ApplicationDataDto[]): Promise<JobSearchEntity[]> {

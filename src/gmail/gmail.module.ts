@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EmailModule } from '../emails/email-intelligence.module';
 import { JobSearchModule } from '../job-search/job-search.module';
+import { PendingActionsModule } from '../pending-actions/pending-actions.module';
 import { UsersModule } from '../users/users.module';
 import { GmailHelperService } from './services/gmail-helper.service';
 import { GmailAuthController } from './controllers/gmail-auth.controller';
@@ -13,7 +14,7 @@ import { GmailProcessingService } from './services/gmail-processing.service';
 import { GmailWatchService } from './services/gmail-watch.service';
 
 @Module({
-  imports: [HttpModule, ConfigModule, UsersModule, EmailModule, JobSearchModule],
+  imports: [HttpModule, ConfigModule, UsersModule, EmailModule, JobSearchModule, PendingActionsModule],
   controllers: [GmailAuthController, GmailWebhookController],
   providers: [GmailAuthService, GmailApiService, GmailWatchService, GmailProcessingService, GmailHelperService],
   exports: [GmailAuthService, GmailApiService, GmailWatchService, GmailProcessingService],
