@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { EmailIntent } from '../../emails/enums/email.enum';
 import { EmailClassificationResult, ParsedEmail } from '../../emails/interfaces/email.interface';
 import { EmailClassificationService } from '../../emails/services/email-classification.service';
@@ -12,26 +11,8 @@ import {
 } from '../../pending-actions/interfaces/pending-action.interface';
 import { PendingActionsService } from '../../pending-actions/services/pending-actions.service';
 import { UserService } from '../../users/users.service';
+import { ATS_DOMAINS } from '../constants/gmail-data';
 import { GmailApiService } from './gmail-api.service';
-
-/**
- * ATS platforms whose noreply domains carry no useful company signal — the
- * employer name is in the From display-name or Subject. These domains
- * always route to LINK_THREAD_TO_APPLICATION (with candidates) instead of
- * a fuzzy match against the domain stub.
- */
-const ATS_DOMAINS: readonly string[] = [
-  'workday.com',
-  'myworkday.com',
-  'myworkdayjobs.com',
-  'greenhouse.io',
-  'grnh.se',
-  'lever.co',
-  'ashbyhq.com',
-  'smartrecruiters.com',
-  'jobvite.com',
-  'icims.com',
-];
 
 @Injectable()
 export class GmailProcessingService {
@@ -45,7 +26,7 @@ export class GmailProcessingService {
     private readonly pendingActionsService: PendingActionsService,
   ) { }
 
-  async processNotification(emailAddress: string, newHistoryId: string): Promise<void> {
+  public async processNotification(emailAddress: string, newHistoryId: string): Promise<void> {
     const user = await this.userService.findByGmailEmail(emailAddress);
     if (!user) {
       this.logger.warn(`No user found for Gmail address: ${emailAddress}`);
@@ -64,6 +45,9 @@ export class GmailProcessingService {
     for (const messageId of messageIds) {
       try {
         const parsedEmail = await this.gmailApiService.fetchMessage(user.userId, messageId);
+        this.logger.debug(
+          `[${messageId}] subject="${parsedEmail.subject}" body[0..300]="${parsedEmail.bodyText.slice(0, 300).replace(/\s+/g, ' ')}"`,
+        );
         const result = await this.classificationService.classify(parsedEmail);
 
         this.logger.log(
@@ -74,7 +58,15 @@ export class GmailProcessingService {
           await this.routeClassifiedEmail(user.userId, parsedEmail, result);
         }
       } catch (err) {
-        this.logger.error(`Failed to process message ${messageId}: ${err}`);
+        const e = err as { message?: string; response?: { status?: number; data?: unknown }; config?: { url?: string } };
+        const status = e.response?.status;
+        const data = e.response?.data;
+        const url = e.config?.url;
+        this.logger.error(
+          `Failed to process message ${messageId}: ${e.message ?? err}` +
+          (status ? ` [HTTP ${status} from ${url}]` : '') +
+          (data ? ` body=${JSON.stringify(data)}` : ''),
+        );
       }
     }
 
@@ -149,7 +141,7 @@ export class GmailProcessingService {
     const suggestedStatus = result.suggestedStatus!;
 
     if (!forceQueue && result.source === 'rules') {
-      // Rules path: status came from the deterministic INTENT_TO_STATUS table —
+      // Rules path: status came from the deterministic INTENT_TO_STATUS table
       // valid by construction. Auto-apply.
       await this.jobSearchService.setStatus(userId, target.jobId, suggestedStatus);
       this.logger.log(
@@ -161,7 +153,7 @@ export class GmailProcessingService {
     // Queue for user confirmation.
     const evidence = this.buildEvidence(email, result);
     const proposed: PendingActionProposedChange = {
-      kind: 'STATUS_CHANGE',
+      kind: PendingActionType.StatusChange,
       jobId: target.jobId,
       fromStatus: target.status,
       toStatus: suggestedStatus,
@@ -170,7 +162,7 @@ export class GmailProcessingService {
     await this.pendingActionsService.create({
       userId,
       jobId: target.jobId,
-      type: PendingActionType.STATUS_CHANGE,
+      type: PendingActionType.StatusChange,
       evidence,
       proposedChange: proposed,
       question: `Mark "${target.companyName}" as ${suggestedStatus}?`,
@@ -186,7 +178,7 @@ export class GmailProcessingService {
   ): Promise<void> {
     const evidence = this.buildEvidence(email, result, { extractedCompanyName: companyName });
     const proposed: PendingActionProposedChange = {
-      kind: 'AUTO_CREATE_APPLICATION',
+      kind: PendingActionType.AutoCreateApplication,
       companyName,
       status: result.suggestedStatus!,
       intent: result.intent,
@@ -194,7 +186,7 @@ export class GmailProcessingService {
     };
     await this.pendingActionsService.create({
       userId,
-      type: PendingActionType.AUTO_CREATE_APPLICATION,
+      type: PendingActionType.AutoCreateApplication,
       evidence,
       proposedChange: proposed,
       question: `Add a new application for "${companyName}" (${result.suggestedStatus})?`,
@@ -241,7 +233,7 @@ export class GmailProcessingService {
     });
     const intentValid = result.suggestedStatus !== undefined;
     const proposed: PendingActionProposedChange = {
-      kind: 'LINK_THREAD_TO_APPLICATION',
+      kind: PendingActionType.LinkThreadToApplication,
       threadId: email.threadId,
       intent: result.intent,
       toStatus: intentValid ? result.suggestedStatus : undefined,
@@ -249,7 +241,7 @@ export class GmailProcessingService {
     const hint = email.senderDisplayName ?? fallbackCompanyName ?? email.senderDomain ?? 'this thread';
     await this.pendingActionsService.create({
       userId,
-      type: PendingActionType.LINK_THREAD_TO_APPLICATION,
+      type: PendingActionType.LinkThreadToApplication,
       evidence,
       proposedChange: proposed,
       question: `Which application does this email from "${hint}" belong to?`,

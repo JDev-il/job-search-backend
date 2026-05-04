@@ -1,8 +1,8 @@
 export enum PendingActionType {
-  STATUS_CHANGE = 'STATUS_CHANGE',
-  AUTO_CREATE_APPLICATION = 'AUTO_CREATE_APPLICATION',
-  LINK_THREAD_TO_APPLICATION = 'LINK_THREAD_TO_APPLICATION',
-  DRAFT_FOLLOW_UP = 'DRAFT_FOLLOW_UP',
+  StatusChange = 'STATUS_CHANGE',
+  AutoCreateApplication = 'AUTO_CREATE_APPLICATION',
+  LinkThreadToApplication = 'LINK_THREAD_TO_APPLICATION',
+  DraftFollowUp = 'DRAFT_FOLLOW_UP',
 }
 
 export enum PendingActionResolution {

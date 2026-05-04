@@ -27,7 +27,10 @@ export class GmailWatchService {
       const response = await firstValueFrom(
         this.httpService.post<GmailWatchResponse>(
           GMAIL_URLS.WATCH,
-          { topicName: this.pubSubTopic, labelIds: ['INBOX'] },
+          // Watch the entire mailbox (not just INBOX) so we still see emails
+          // that user-defined filters route to other labels on arrival.
+          // Classification filters out non-job content downstream.
+          { topicName: this.pubSubTopic },
           { headers: { Authorization: `Bearer ${token}` } },
         ),
       );

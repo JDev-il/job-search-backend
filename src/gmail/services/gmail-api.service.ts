@@ -25,7 +25,7 @@ export class GmailApiService {
     const response = await firstValueFrom(
       this.httpService.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { startHistoryId, historyTypes: 'messageAdded', labelId: 'INBOX' },
+        params: { startHistoryId, historyTypes: 'messageAdded' },
       }),
     );
 
@@ -59,7 +59,6 @@ export class GmailApiService {
         params: { format: 'full' },
       }),
     );
-
     return this.parseMessage(response.data);
   }
 

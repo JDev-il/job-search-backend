@@ -26,13 +26,13 @@ export class PendingActionsExecutor {
    */
   async execute(action: PendingActionEntity, body: AcceptPendingActionDto): Promise<void> {
     switch (action.type) {
-      case PendingActionType.STATUS_CHANGE:
+      case PendingActionType.StatusChange:
         return this.executeStatusChange(action);
-      case PendingActionType.AUTO_CREATE_APPLICATION:
+      case PendingActionType.AutoCreateApplication:
         return this.executeAutoCreate(action);
-      case PendingActionType.LINK_THREAD_TO_APPLICATION:
+      case PendingActionType.LinkThreadToApplication:
         return this.executeLinkThread(action, body);
-      case PendingActionType.DRAFT_FOLLOW_UP:
+      case PendingActionType.DraftFollowUp:
         // Out of scope.
         this.logger.warn(`DRAFT_FOLLOW_UP execution not implemented (action=${action.id})`);
         return;
@@ -40,7 +40,7 @@ export class PendingActionsExecutor {
   }
 
   private async executeStatusChange(action: PendingActionEntity): Promise<void> {
-    if (action.proposedChange.kind !== 'STATUS_CHANGE') {
+    if (action.proposedChange.kind !== PendingActionType.StatusChange) {
       throw new BadRequestException('proposedChange does not match action type');
     }
     const { jobId, toStatus, intent } = action.proposedChange;
@@ -62,7 +62,7 @@ export class PendingActionsExecutor {
   }
 
   private async executeAutoCreate(action: PendingActionEntity): Promise<void> {
-    if (action.proposedChange.kind !== 'AUTO_CREATE_APPLICATION') {
+    if (action.proposedChange.kind !== PendingActionType.AutoCreateApplication) {
       throw new BadRequestException('proposedChange does not match action type');
     }
     const { companyName, status, intent, threadId } = action.proposedChange as AutoCreateApplicationProposed;
@@ -83,7 +83,7 @@ export class PendingActionsExecutor {
     action: PendingActionEntity,
     body: AcceptPendingActionDto,
   ): Promise<void> {
-    if (action.proposedChange.kind !== 'LINK_THREAD_TO_APPLICATION') {
+    if (action.proposedChange.kind !== PendingActionType.LinkThreadToApplication) {
       throw new BadRequestException('proposedChange does not match action type');
     }
     const { jobId } = body;

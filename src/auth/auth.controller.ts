@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Controller, Get, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { HelperService } from './../services/helper.service';
 import { AuthService } from './auth.service';
@@ -15,32 +15,14 @@ export class AuthController {
     private configService: ConfigService,
   ) { }
 
-  //! TEMP FOR TESTING
-  @Get('logintest')
-  async logintest(@Body() userDto: any) {
-    userDto = {
-      email: 'jdev@gmail.com',
-      password: 'jdev2025'
-    }
-    const user = await this.authService.validateUser(userDto.email, userDto.password);
-    if (!user) {
-      throw new UnauthorizedException();
-    }
-    return this.authService.generateToken(user);
-  }
-  //! TEMP FOR TESTING
-
   @UseGuards(JwtAuthGuard)
   @Post('login')
   async login(@Req() req: Request): Promise<ValidatedLoginDto> {
     if (req.user) {
-      return <ValidatedLoginDto>await this.authService.tokenGenerator(req.user as PayloadUserDto);
+      return await this.authService.tokenGenerator(req.user as PayloadUserDto);
     }
-    const isUserValid = await this.authService.userValidation(req.body);
-    if (isUserValid) {
-      return <ValidatedLoginDto>await this.authService.tokenGenerator(req.body);
-    }
-    throw new UnauthorizedException();
+    const user = await this.authService.validateUser(req.body.email, req.body.password);
+    return await this.authService.tokenGenerator({ userId: user.userId, email: user.email });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -54,7 +36,7 @@ export class AuthController {
   @Post('signtoken')
   async sign(@Req() req: Request): Promise<ValidatedLoginDto | null> {
     const tokenObj = await this.authService.tokenGenerator(req.body);
-    return !tokenObj ? null : tokenObj;
+    return tokenObj ?? null;
   }
 
   @UseGuards(JwtAuthGuard)

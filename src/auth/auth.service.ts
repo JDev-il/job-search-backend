@@ -2,20 +2,15 @@ import { ConfigService } from '@nestjs/config';
 // src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
 import { GmailWatchService } from '../gmail/services/gmail-watch.service';
 import { TestingService } from '../temp/testing.service';
-import { UserEntity } from '../users/entities/user.entity';
 import { UserService } from '../users/users.service';
-import { AuthorizedUserDto, LoginUserDto, PayloadUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
+import { AuthorizedUserDto, PayloadUserDto, ValidatedLoginDto } from './dto/user/login-user.dto';
 @Injectable()
 export class AuthService {
 
   constructor(
-    @InjectRepository(UserEntity)
-    private usersRepository: Repository<UserEntity>,
     private jwtService: JwtService,
     private readonly usersService: UserService,
     private configService: ConfigService,
@@ -75,8 +70,6 @@ export class AuthService {
     }
     throw new UnauthorizedException('Invalid credentials'); // Invalid email/password
   }
-  //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING //! TEMPORARY FRO TESTING
-
 
   async tokenGenerator(user: PayloadUserDto): Promise<ValidatedLoginDto> {
     const payload = { userId: user.userId, email: user.email };
@@ -84,7 +77,7 @@ export class AuthService {
       secret: this.configService.get<string>('JWT_SECRET_KEY'),
       expiresIn: '1d',
     });
-    return { email: user.email, auth_token: token };
+    return { email: user.email, auth_token: token, userId: user.userId };
   }
 
   async tokenVerification(token: string): Promise<AuthorizedUserDto> {
@@ -92,17 +85,6 @@ export class AuthService {
       return await this.jwtService.verify(token, { secret: this.configService.get('JWT_SECRET_KEY'), });
     } catch {
       throw new UnauthorizedException();
-    }
-  }
-
-  async userValidation(loginUser: LoginUserDto): Promise<boolean> {
-    const { email, password } = <LoginUserDto>loginUser;
-    try {
-      const user = await this.usersRepository.findOne({ where: { email } });
-      const passwordVerification = await bcrypt.compare(password, user.password);
-      return !!passwordVerification;
-    } catch {
-      throw new UnauthorizedException('User does not exist!');
     }
   }
 
