@@ -6,6 +6,9 @@ export class ValidatedLoginDto { // User needs to go through validation in order
 
   @IsString()
   auth_token: string;
+
+  @IsNumber()
+  userId: number;
 }
 
 export class NewUserDto {

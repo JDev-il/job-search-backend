@@ -39,7 +39,14 @@ export class GmailWebhookController {
 
     // Fire-and-forget: always return 200 so Pub/Sub doesn't retry
     this.processingService.processNotification(emailAddress, historyId).catch((err) => {
-      this.logger.error(`processNotification failed: ${err.message}`);
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      const url = err?.config?.url;
+      this.logger.error(
+        `processNotification failed: ${err.message}` +
+        (status ? ` [HTTP ${status} from ${url}]` : '') +
+        (data ? ` body=${JSON.stringify(data)}` : ''),
+      );
     });
   }
 }

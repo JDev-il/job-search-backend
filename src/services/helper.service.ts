@@ -5,6 +5,8 @@ import { EmailIntent, RuleField } from "../emails/enums/email.enum";
 import { IntentSignalRule, NormalizedEmail } from "../emails/interfaces/email.interface";
 import { MCPBasePayload, MCPRequestDto } from "../mcp/dto/mcp.dto";
 import { ProcessType } from "../mcp/enum/process.enum";
+import { PendingActionResponseDto } from "../pending-actions/dto/pending-action.dto";
+import { PendingActionEntity } from "../pending-actions/entities/pending-action.entity";
 
 @Injectable()
 export class HelperService {
@@ -67,4 +69,19 @@ export class HelperService {
       [EmailIntent.UNKNOWN]: 0,
     }
   }
+
+  public toResponse(entity: PendingActionEntity): PendingActionResponseDto {
+    return {
+      id: entity.id,
+      type: entity.type,
+      question: entity.question,
+      jobId: entity.jobId,
+      evidence: entity.evidence,
+      proposedChange: entity.proposedChange,
+      resolution: entity.resolution,
+      createdAt: entity.createdAt,
+      resolvedAt: entity.resolvedAt,
+    };
+  }
+
 }

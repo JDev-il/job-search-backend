@@ -41,7 +41,7 @@ export class OpenAIService {
     };
 
     const body = {
-      model: 'gpt-4o',
+      model: 'gpt-3.5-turbo',
       messages,
       response_format: { type: 'json_object' },
     };

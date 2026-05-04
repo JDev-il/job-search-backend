@@ -58,7 +58,7 @@ export type PendingActionProposedChange =
   | DraftFollowUpProposed;
 
 export interface StatusChangeProposed {
-  kind: 'STATUS_CHANGE';
+  kind: PendingActionType.StatusChange;
   jobId: number;
   fromStatus: string;
   toStatus: ApplicationStatus;
@@ -66,7 +66,7 @@ export interface StatusChangeProposed {
 }
 
 export interface AutoCreateApplicationProposed {
-  kind: 'AUTO_CREATE_APPLICATION';
+  kind: PendingActionType.AutoCreateApplication;
   companyName: string;
   status: ApplicationStatus;
   intent: EmailIntent;
@@ -74,7 +74,7 @@ export interface AutoCreateApplicationProposed {
 }
 
 export interface LinkThreadToApplicationProposed {
-  kind: 'LINK_THREAD_TO_APPLICATION';
+  kind: PendingActionType.LinkThreadToApplication;
   threadId: string;
   /**
    * On accept, the user picks one of evidence.candidates. The chosen jobId is
@@ -86,6 +86,6 @@ export interface LinkThreadToApplicationProposed {
 }
 
 export interface DraftFollowUpProposed {
-  kind: 'DRAFT_FOLLOW_UP';
+  kind: PendingActionType.DraftFollowUp;
   jobId?: number;
 }
