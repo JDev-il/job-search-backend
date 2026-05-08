@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Header, HttpCode, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { GmailCallbackDto } from '../dto/gmail-callback.dto';
@@ -10,7 +10,7 @@ export class GmailAuthController {
   constructor(
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailWatchService: GmailWatchService,
-  ) {}
+  ) { }
 
   /**
    * Step 1: frontend calls this (with Bearer token) to get the OAuth URL,
@@ -21,6 +21,12 @@ export class GmailAuthController {
   getAuthUrl(@Req() req: Request): { url: string } {
     const userId = (req.user as { userId: number }).userId;
     return { url: this.gmailAuthService.getAuthUrl(userId) };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('consent')
+  recordConsent(@Body('accepted') accepted: boolean): { gmailConsent: boolean } {
+    return { gmailConsent: !!accepted };
   }
 
   /**
