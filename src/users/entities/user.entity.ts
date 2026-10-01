@@ -28,9 +28,11 @@ export class UserEntity {
   updatedAt: Date | null;
 
   @Column({ name: 'gmail_access_token', nullable: true })
+  @Exclude()
   gmailAccessToken: string | null;
 
   @Column({ name: 'gmail_refresh_token', nullable: true })
+  @Exclude()
   gmailRefreshToken: string | null;
 
   @Column({ name: 'gmail_token_expiry', type: 'timestamp', nullable: true })
@@ -43,6 +45,7 @@ export class UserEntity {
   gmailEmail: string | null;
 
   @Column({ name: 'google_id', nullable: true })
+  @Exclude()
   googleId: string | null;
 
   @OneToMany(() => JobSearchEntity, (jobSearch) => jobSearch.user)
