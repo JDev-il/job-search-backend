@@ -1,11 +1,14 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { firstValueFrom } from 'rxjs';
 import { GOOGLE_AUTH_URL, GOOGLE_REVOKE_URL } from '../../auth/constants';
 import { UserService } from '../../users/users.service';
 import { GMAIL_URLS } from '../constants/urls';
 import { GmailHelperService } from './gmail-helper.service';
+
+const OAUTH_STATE_PURPOSE = 'gmail-oauth-state';
 
 @Injectable()
 export class GmailAuthService {
@@ -17,13 +20,23 @@ export class GmailAuthService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly userService: UserService,
-    private readonly gmailHelperService: GmailHelperService
+    private readonly gmailHelperService: GmailHelperService,
+    private readonly jwtService: JwtService,
   ) {
     this.clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     this.redirectUri = this.configService.get<string>('GOOGLE_GMAIL_REDIRECT_URI');
   }
 
   public getAuthUrl(userId: number): string {
+    // `state` used to be a raw, unsigned userId: anyone completing their
+    // OWN Google consent could call the callback with a different userId
+    // as `state` and have their Gmail tokens saved onto that other
+    // account. Signing it closes that off — the callback only accepts a
+    // state it (or rather, we) actually issued, for that exact userId.
+    const state = this.jwtService.sign(
+      { userId, purpose: OAUTH_STATE_PURPOSE },
+      { secret: this.configService.get<string>('JWT_SECRET_KEY'), expiresIn: '10m' },
+    );
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -31,9 +44,23 @@ export class GmailAuthService {
       scope: GMAIL_URLS.SCOPE,
       access_type: 'offline',
       prompt: 'consent', // ensures refresh_token is always returned
-      state: String(userId),
+      state,
     });
     return `${GOOGLE_AUTH_URL}?${params.toString()}`;
+  }
+
+  public verifyStateToken(state: string): number {
+    try {
+      const payload = this.jwtService.verify<{ userId: number; purpose: string }>(state, {
+        secret: this.configService.get<string>('JWT_SECRET_KEY'),
+      });
+      if (payload.purpose !== OAUTH_STATE_PURPOSE || typeof payload.userId !== 'number') {
+        throw new Error('Unexpected state payload');
+      }
+      return payload.userId;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Gmail OAuth state');
+    }
   }
 
   public async exchangeCodeForTokens(code: string, userId: number): Promise<{ gmailEmail: string }> {
