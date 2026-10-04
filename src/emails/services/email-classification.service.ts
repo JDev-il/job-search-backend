@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HelperService } from '../../services/helper.service.js';
+import { HelperService } from '../../services/helper.service';
 import { EMAIL_SIGNAL_RULES } from '../constants/email-signal-rules.ts';
 import { EmailIntent, RuleField } from '../enums/email.enum';
 import {
