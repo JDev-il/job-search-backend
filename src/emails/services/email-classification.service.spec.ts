@@ -1,6 +1,11 @@
+import { HttpService } from '@nestjs/axios';
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, it } from 'node:test';
+// This file is written entirely against Jest's own API (jest.fn(),
+// jest.Mocked<>, jest.spyOn — all used below), which Jest already injects
+// as globals. The import below pulled describe/it/beforeEach from Node's
+// built-in test runner instead, shadowing Jest's globals with an
+// incompatible implementation and breaking the whole suite under `npm test`.
 import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { HelperService } from '../../services/helper.service';
 import { EmailIntent } from '../enums/email.enum';
@@ -131,6 +136,10 @@ describe('EmailClassificationService', () => {
         EmailNormalizerService,
         EmailIntentMapper,
         HelperService,
+        // HelperService depends on HttpService (@nestjs/axios) but none of
+        // the methods this suite actually exercises (getEmailScores,
+        // getFieldText) use it — a bare stub is enough to satisfy DI.
+        { provide: HttpService, useValue: {} },
         { provide: EmailLLMClassificationService, useValue: mockLlm },
       ],
     }).compile();
