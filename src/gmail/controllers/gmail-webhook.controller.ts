@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Logger, Post, Query, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
 import { PubSubEmailNotification, PubSubWebhookDto } from '../dto/pubsub-webhook.dto';
 import { GmailProcessingService } from '../services/gmail-processing.service';
 
@@ -21,7 +22,7 @@ export class GmailWebhookController {
     @Query('token') token: string,
     @Body() body: PubSubWebhookDto,
   ): Promise<void> {
-    if (token !== this.webhookToken) {
+    if (!this.isValidToken(token)) {
       throw new UnauthorizedException('Invalid webhook token');
     }
 
@@ -48,5 +49,23 @@ export class GmailWebhookController {
         (data ? ` body=${JSON.stringify(data)}` : ''),
       );
     });
+  }
+
+  // Pub/Sub push subscriptions don't support a custom header, and the push
+  // body's shape and attributes come from whoever publishes to the topic
+  // (Gmail's own watch mechanism), not from us — so a query-string token is
+  // the only secret-we-control option short of full OIDC (which needs a
+  // push-auth service account provisioned in GCP; tracked separately).
+  // This at least removes the `!==` timing side-channel on the comparison.
+  private isValidToken(token: string): boolean {
+    if (!token || !this.webhookToken) {
+      return false;
+    }
+    const provided = Buffer.from(token);
+    const expected = Buffer.from(this.webhookToken);
+    if (provided.length !== expected.length) {
+      return false;
+    }
+    return timingSafeEqual(provided, expected);
   }
 }

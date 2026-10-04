@@ -39,7 +39,7 @@ export class GmailAuthController {
   async handleCallback(
     @Query() dto: GmailCallbackDto,
   ): Promise<string> {
-    const userId = Number(dto.state);
+    const userId = this.gmailAuthService.verifyStateToken(dto.state);
     const { gmailEmail } = await this.gmailAuthService.exchangeCodeForTokens(dto.code, userId);
     await this.gmailWatchService.registerWatch(userId, gmailEmail);
     return `<html><body><script>
