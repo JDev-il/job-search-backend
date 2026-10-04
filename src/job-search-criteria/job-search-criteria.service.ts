@@ -10,8 +10,12 @@ export class JobSearchCriteriaService {
     private readonly jobSearchCriteriaRepository: Repository<JobSearchCriteriaEntity>,
   ) { }
 
-  async getJobCriteriaData(): Promise<JobSearchCriteriaEntity[]> {
-    const criterias = await this.jobSearchCriteriaRepository.find();
+  // Previously had no `where` clause at all — it returned every user's
+  // criteria to whoever called the (also unguarded) controller route.
+  async getJobCriteriaData(userId: number): Promise<JobSearchCriteriaEntity[]> {
+    const criterias = await this.jobSearchCriteriaRepository.find({
+      where: { user: { userId } },
+    });
     if (!criterias.length) {
       throw new NotFoundException({ error: 'Criterias not found' })
     }
