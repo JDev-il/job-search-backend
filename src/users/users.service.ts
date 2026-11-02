@@ -13,6 +13,14 @@ export interface GoogleUserData {
   lastName: string;
 }
 
+const DISCONNECTED_GMAIL = {
+  gmailAccessToken: null,
+  gmailRefreshToken: null,
+  gmailTokenExpiry: null,
+  gmailHistoryId: null,
+  gmailEmail: null,
+};
+
 @Injectable()
 export class UserService {
 
@@ -92,13 +100,21 @@ export class UserService {
   }
 
   async clearGmailTokens(userId: number): Promise<void> {
-    await this.userRepository.update(userId, {
-      gmailAccessToken: null,
-      gmailRefreshToken: null,
-      gmailTokenExpiry: null,
-      gmailHistoryId: null,
-      gmailEmail: null,
-    });
+    await this.userRepository.update(userId, DISCONNECTED_GMAIL);
+  }
+
+  /**
+   * Drops the Gmail connection only while the stored refresh token is still
+   * the one that just failed. If the user reconnected while the failing
+   * refresh was in flight, the row holds a newer token and is left alone.
+   * Only the gmail_* columns are touched, never the user's own login data.
+   */
+  async clearGmailTokensIfRefreshToken(userId: number, refreshToken: string): Promise<boolean> {
+    const result = await this.userRepository.update(
+      { userId, gmailRefreshToken: refreshToken },
+      DISCONNECTED_GMAIL,
+    );
+    return (result.affected ?? 0) > 0;
   }
 
   async findByGoogleId(googleId: string): Promise<UserEntity | null> {

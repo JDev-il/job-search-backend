@@ -6,9 +6,16 @@ import { firstValueFrom } from 'rxjs';
 import { GOOGLE_AUTH_URL, GOOGLE_REVOKE_URL } from '../../auth/constants';
 import { UserService } from '../../users/users.service';
 import { GMAIL_URLS } from '../constants/urls';
+import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
 import { GmailHelperService } from './gmail-helper.service';
 
 const OAUTH_STATE_PURPOSE = 'gmail-oauth-state';
+
+/** Google answers a dead/revoked/expired refresh token with 400 {"error":"invalid_grant"}. */
+function isInvalidGrant(err: unknown): boolean {
+  const body = (err as { response?: { data?: { error?: unknown } } })?.response?.data;
+  return body?.error === 'invalid_grant';
+}
 
 @Injectable()
 export class GmailAuthService {
@@ -80,7 +87,7 @@ export class GmailAuthService {
     const tokens = await this.userService.getGmailTokens(userId);
 
     if (!tokens?.gmailAccessToken || !tokens?.gmailRefreshToken) {
-      throw new UnauthorizedException(`User ${userId} has not connected Gmail`);
+      throw new GmailReconnectRequiredException(`User ${userId} has not connected Gmail`);
     }
 
     const isExpired = !tokens.gmailTokenExpiry || new Date() >= tokens.gmailTokenExpiry;
@@ -112,7 +119,22 @@ export class GmailAuthService {
   }
 
   private async refreshAccessToken(userId: number, refreshToken: string): Promise<string> {
-    const response = await this.gmailHelperService.gmailRefreshAccessToken(refreshToken);
+    let response: Awaited<ReturnType<GmailHelperService['gmailRefreshAccessToken']>>;
+    try {
+      response = await this.gmailHelperService.gmailRefreshAccessToken(refreshToken);
+    } catch (err) {
+      // Anything but an explicit invalid_grant (network blip, 5xx, wrong
+      // client credentials) is not proof the grant is dead — don't touch it.
+      if (!isInvalidGrant(err)) throw err;
+
+      const cleared = await this.userService.clearGmailTokensIfRefreshToken(userId, refreshToken);
+      this.logger.warn(
+        cleared
+          ? `Google rejected the Gmail refresh token for user ${userId} (invalid_grant) — connection cleared, user must reconnect`
+          : `Google rejected an old Gmail refresh token for user ${userId} (invalid_grant), but newer tokens are stored — left untouched`,
+      );
+      throw new GmailReconnectRequiredException(`Gmail access for user ${userId} has expired or was revoked`);
+    }
 
     const { access_token, expires_in } = response.data;
     const expiry = new Date(Date.now() + expires_in * 1000);

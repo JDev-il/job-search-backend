@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../users/users.service';
 import { GMAIL_URLS } from '../constants/urls';
+import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
 import { GmailWatchResponse } from '../interfaces/gmail.interface';
 import { GmailAuthService } from './gmail-auth.service';
 @Injectable()
@@ -22,8 +23,8 @@ export class GmailWatchService {
   }
 
   async registerWatch(userId: number, gmailEmail: string): Promise<void> {
-    const token = await this.gmailAuthService.getValidToken(userId);
     try {
+      const token = await this.gmailAuthService.getValidToken(userId);
       const response = await firstValueFrom(
         this.httpService.post<GmailWatchResponse>(
           GMAIL_URLS.WATCH,
@@ -38,8 +39,18 @@ export class GmailWatchService {
       await this.userService.saveGmailWatchData(userId, historyId, gmailEmail);
       this.logger.log(`Watch registered for user ${userId} (${gmailEmail}), historyId=${historyId}`);
     }
-    catch {
-      this.logger.error(`Error registering to Gmail account for user: {id: ${userId}, email: ${gmailEmail}}`);
+    catch (err) {
+      if (err instanceof GmailReconnectRequiredException) {
+        this.logger.warn(`Not registering a Gmail watch for user ${userId}: Gmail needs to be reconnected`);
+        return;
+      }
+      // message/status/body only — the axios error's `config` carries the Bearer header.
+      const e = err as { message?: string; response?: { status?: number; data?: unknown } };
+      this.logger.error(
+        `Error registering to Gmail account for user: {id: ${userId}, email: ${gmailEmail}}: ${e?.message ?? err}` +
+        (e?.response?.status ? ` [HTTP ${e.response.status}]` : '') +
+        (e?.response?.data ? ` body=${JSON.stringify(e.response.data)}` : ''),
+      );
     }
   }
 

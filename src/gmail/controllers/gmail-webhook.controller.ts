@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, Logger, Post, Query, UnauthorizedException 
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
 import { PubSubEmailNotification, PubSubWebhookDto } from '../dto/pubsub-webhook.dto';
+import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
 import { GmailProcessingService } from '../services/gmail-processing.service';
 
 @Controller('gmail')
@@ -40,6 +41,11 @@ export class GmailWebhookController {
 
     // Fire-and-forget: always return 200 so Pub/Sub doesn't retry
     this.processingService.processNotification(emailAddress, historyId).catch((err) => {
+      if (err instanceof GmailReconnectRequiredException) {
+        // Expected until the user reconnects — not an error worth a stack of noise.
+        this.logger.warn(`processNotification skipped: ${err.message}`);
+        return;
+      }
       const status = err?.response?.status;
       const data = err?.response?.data;
       const url = err?.config?.url;
