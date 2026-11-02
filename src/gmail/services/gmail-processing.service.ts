@@ -45,8 +45,10 @@ export class GmailProcessingService {
     for (const messageId of messageIds) {
       try {
         const parsedEmail = await this.gmailApiService.fetchMessage(user.userId, messageId);
+        // Never log message content (subject/body): it is restricted Gmail
+        // user data and the server logs are not a place it should end up.
         this.logger.debug(
-          `[${messageId}] subject="${parsedEmail.subject}" body[0..300]="${parsedEmail.bodyText.slice(0, 300).replace(/\s+/g, ' ')}"`,
+          `[${messageId}] fetched: senderDomain=${parsedEmail.senderDomain ?? 'n/a'}, bodyChars=${parsedEmail.bodyText.length}`,
         );
         const result = await this.classificationService.classify(parsedEmail);
 
