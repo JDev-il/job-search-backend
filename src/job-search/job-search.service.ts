@@ -98,6 +98,25 @@ export class JobSearchService {
       .getOne();
   }
 
+  /**
+   * For a proposal to add an application that the user may already have added
+   * themselves: finds their open application for the company and, if it isn't
+   * linked to a Gmail thread yet, attaches this one so later mail in the thread
+   * routes straight to it. Returns the application, or null if there is none.
+   */
+  async adoptExisting(
+    userId: number,
+    companyName: string,
+    gmailThreadId?: string,
+  ): Promise<JobSearchEntity | null> {
+    const existing = await this.findMatchingApplication(userId, companyName);
+    if (!existing) return null;
+    if (gmailThreadId && !existing.gmailThreadId) {
+      await this.setThreadId(userId, existing.jobId, gmailThreadId);
+    }
+    return existing;
+  }
+
   async createAutoApplication(
     userId: number,
     companyName: string,

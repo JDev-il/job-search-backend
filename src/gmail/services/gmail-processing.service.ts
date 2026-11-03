@@ -15,6 +15,9 @@ import { ATS_DOMAINS } from '../constants/gmail-data';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import { GmailApiService } from './gmail-api.service';
 
+/** A pass that has run this long is presumed stuck; a new notification may start its own. */
+const STALE_PASS_MS = 20 * 60_000;
+
 @Injectable()
 export class GmailProcessingService {
   private readonly logger = new Logger(GmailProcessingService.name);
@@ -27,7 +30,59 @@ export class GmailProcessingService {
     private readonly pendingActionsService: PendingActionsService,
   ) { }
 
+  /**
+   * Mailboxes with a pass in flight, and the latest historyId that arrived
+   * for each while it ran. Process-local coordination, nothing is persisted:
+   * with several app instances it degrades to the old behaviour, no worse.
+   */
+  private readonly running = new Map<string, { startedAt: number }>();
+  private readonly queued = new Map<string, string>();
+
+  /**
+   * Gmail pushes one notification per change, seconds apart when several
+   * emails land together, and each handler runs unawaited. Overlapping passes
+   * would all read the same stored cursor and fetch + classify the same
+   * messages again (a full message fetch is 60 quota units, plus an LLM call).
+   * So only one pass runs per mailbox; anything arriving meanwhile is folded
+   * into a single follow-up pass, which re-reads the cursor and so also covers
+   * what the earlier notifications announced.
+   *
+   * Requests have timeouts, so a pass normally ends. If one is still "running"
+   * after STALE_PASS_MS anyway, it is presumed stuck and the next notification
+   * takes over rather than queueing behind it forever.
+   */
   public async processNotification(emailAddress: string, newHistoryId: string): Promise<void> {
+    const key = (emailAddress ?? '').toLowerCase();
+    const current = this.running.get(key);
+    if (current && Date.now() - current.startedAt < STALE_PASS_MS) {
+      this.queued.set(key, newHistoryId);
+      return;
+    }
+    if (current) {
+      this.logger.warn(`A pass for ${emailAddress} has been running for over ${STALE_PASS_MS / 60_000} minutes — starting a new one`);
+    }
+
+    const mine = { startedAt: Date.now() };
+    this.running.set(key, mine);
+    try {
+      let next: string | undefined = newHistoryId;
+      while (next !== undefined) {
+        this.queued.delete(key);
+        await this.processOnce(emailAddress, next);
+        if (this.running.get(key) !== mine) break; // taken over while stuck: the newer pass owns the queue now
+        next = this.queued.get(key);
+      }
+    } finally {
+      // A failed pass never advanced the cursor, so whatever was queued behind
+      // it is still covered by the next notification's read from that cursor.
+      if (this.running.get(key) === mine) {
+        this.running.delete(key);
+        this.queued.delete(key);
+      }
+    }
+  }
+
+  private async processOnce(emailAddress: string, newHistoryId: string): Promise<void> {
     const user = await this.userService.findByGmailEmail(emailAddress);
     if (!user) {
       this.logger.warn(`No user found for Gmail address: ${emailAddress}`);

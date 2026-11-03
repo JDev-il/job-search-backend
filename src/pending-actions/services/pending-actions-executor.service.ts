@@ -71,6 +71,16 @@ export class PendingActionsExecutor {
         `Status ${status} is no longer valid for intent ${intent}`,
       );
     }
+    // The confirmation email usually lands before the user logs the
+    // application, so they may have added it by hand since this was proposed.
+    // Never create a second row for it; just link the thread to theirs.
+    const existing = await this.jobSearchService.adoptExisting(action.userId, companyName, threadId);
+    if (existing) {
+      this.logger.log(
+        `AUTO_CREATE ${action.id}: user ${action.userId} already has "${existing.companyName}" — linked instead of creating`,
+      );
+      return;
+    }
     await this.jobSearchService.createAutoApplication(
       action.userId,
       companyName,

@@ -14,6 +14,7 @@ import { HelperService } from '../services/helper.service';
 import { AcceptPendingActionDto, PendingActionResponseDto } from './dto/pending-action.dto';
 import { PendingActionResolution } from './enums/pending-action.enum';
 import { PendingActionsExecutor } from './services/pending-actions-executor.service';
+import { PendingActionsReconciler } from './services/pending-actions-reconciler.service';
 import { PendingActionsService } from './services/pending-actions.service';
 
 interface AuthedRequest extends Request {
@@ -26,12 +27,14 @@ export class PendingActionsController {
   constructor(
     private readonly pendingActions: PendingActionsService,
     private readonly executor: PendingActionsExecutor,
+    private readonly reconciler: PendingActionsReconciler,
     private helperService: HelperService
   ) { }
 
   @Get()
   async list(@Req() req: AuthedRequest): Promise<PendingActionResponseDto[]> {
-    const items = await this.pendingActions.listPendingForUser(req.user.userId);
+    const pending = await this.pendingActions.listPendingForUser(req.user.userId);
+    const items = await this.reconciler.dropSatisfied(req.user.userId, pending);
     return items.map(this.helperService.toResponse);
   }
 
