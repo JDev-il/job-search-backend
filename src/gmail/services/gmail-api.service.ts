@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { ParsedEmail } from '../../emails/interfaces/email.interface';
 import { GMAIL_URLS } from '../constants/urls';
+import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import {
   GmailHistoryResponse,
   GmailMessageDetail,
@@ -22,19 +23,33 @@ export class GmailApiService {
 
   async getNewMessageIds(userId: number, startHistoryId: string): Promise<string[]> {
     const token = await this.gmailAuthService.getValidToken(userId);
-    const response = await firstValueFrom(
-      this.httpService.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { startHistoryId, historyTypes: 'messageAdded' },
-      }),
-    );
+    const messageIds = new Set<string>();
+    let pageToken: string | undefined;
 
-    const messageIds = (response.data.history ?? [])
-      .flatMap((h) => h.messagesAdded ?? [])
-      .map((m) => m.message.id);
+    try {
+      // history.list is paginated; stopping at the first page would drop the
+      // rest while the caller still moves the cursor past them.
+      do {
+        const response = await firstValueFrom(
+          this.httpService.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { startHistoryId, historyTypes: 'messageAdded', ...(pageToken && { pageToken }) },
+          }),
+        );
+        for (const record of response.data.history ?? []) {
+          for (const added of record.messagesAdded ?? []) messageIds.add(added.message.id);
+        }
+        pageToken = response.data.nextPageToken;
+      } while (pageToken);
+    } catch (err) {
+      if ((err as { response?: { status?: number } })?.response?.status === 404) {
+        throw new GmailHistoryExpiredException();
+      }
+      throw err;
+    }
 
-    this.logger.debug(`History API returned ${messageIds.length} new message(s) for user ${userId}`);
-    return messageIds;
+    this.logger.debug(`History API returned ${messageIds.size} new message(s) for user ${userId}`);
+    return [...messageIds];
   }
 
   async listUnreadMessageIds(userId: number): Promise<string[]> {

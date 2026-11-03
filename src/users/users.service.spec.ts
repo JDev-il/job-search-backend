@@ -40,3 +40,33 @@ describe('UserService.clearGmailTokensIfRefreshToken', () => {
     });
   });
 });
+
+describe('UserService.saveGmailWatchData', () => {
+  let repo: { update: jest.Mock };
+  let service: UserService;
+
+  beforeEach(() => {
+    repo = { update: jest.fn().mockResolvedValue({ affected: 1 }) };
+    service = new UserService(repo as any);
+  });
+
+  it('always records the Gmail address', async () => {
+    await service.saveGmailWatchData(3, '555', 'me@gmail.com');
+
+    expect(repo.update).toHaveBeenCalledWith(3, { gmailEmail: 'me@gmail.com' });
+  });
+
+  it('seeds the history cursor only while none is stored, so re-registering the watch cannot skip unprocessed mail', async () => {
+    await service.saveGmailWatchData(3, '555', 'me@gmail.com');
+
+    const cursorWrite = repo.update.mock.calls.find(([, values]) => 'gmailHistoryId' in values);
+    expect(cursorWrite).toBeDefined();
+    const [criteria, values] = cursorWrite;
+    expect(values).toEqual({ gmailHistoryId: '555' });
+    // The criteria must pin "no cursor yet" (IsNull), not just the user id,
+    // otherwise an existing cursor would be overwritten.
+    expect(criteria.userId).toBe(3);
+    expect(criteria.gmailHistoryId).toBeDefined();
+    expect(criteria.gmailHistoryId._type).toBe('isNull');
+  });
+});

@@ -12,6 +12,7 @@ import {
 import { PendingActionsService } from '../../pending-actions/services/pending-actions.service';
 import { UserService } from '../../users/users.service';
 import { ATS_DOMAINS } from '../constants/gmail-data';
+import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import { GmailApiService } from './gmail-api.service';
 
 @Injectable()
@@ -39,7 +40,20 @@ export class GmailProcessingService {
       return;
     }
 
-    const messageIds = await this.gmailApiService.getNewMessageIds(user.userId, user.gmailHistoryId);
+    let messageIds: string[];
+    try {
+      messageIds = await this.gmailApiService.getNewMessageIds(user.userId, user.gmailHistoryId);
+    } catch (err) {
+      if (!(err instanceof GmailHistoryExpiredException)) throw err;
+      // Gmail dropped the history for this cursor, so the mail in between can't
+      // be read any more. Restart from this notification; leaving the stale
+      // cursor would fail every later push the same way.
+      this.logger.warn(
+        `Gmail history for user ${user.userId} has expired (cursor ${user.gmailHistoryId}) — restarting from ${newHistoryId}; mail received in between was not processed`,
+      );
+      await this.userService.updateGmailHistoryId(user.userId, newHistoryId);
+      return;
+    }
     this.logger.log(`Processing ${messageIds.length} new message(s) for user ${user.userId}`);
 
     for (const messageId of messageIds) {

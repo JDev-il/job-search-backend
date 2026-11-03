@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { CreateUserDto } from '../auth/dto/user/create-user.dto';
 import { NewUserDto } from '../auth/dto/user/login-user.dto';
 import { UserEntity } from './entities/user.entity';
@@ -68,7 +68,11 @@ export class UserService {
   }
 
   async saveGmailWatchData(userId: number, historyId: string, gmailEmail: string): Promise<void> {
-    await this.userRepository.update(userId, { gmailHistoryId: historyId, gmailEmail });
+    await this.userRepository.update(userId, { gmailEmail });
+    // The watch is re-registered on every Google sign-in and every cron run.
+    // Overwriting the cursor each time would skip any mail not processed yet,
+    // so it is only seeded while empty (first connect, or after a disconnect).
+    await this.userRepository.update({ userId, gmailHistoryId: IsNull() }, { gmailHistoryId: historyId });
   }
 
   async findUsersWithGmail(): Promise<UserEntity[]> {
