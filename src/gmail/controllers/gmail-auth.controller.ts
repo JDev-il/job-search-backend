@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpException, HttpStatus, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { GmailCallbackDto } from '../dto/gmail-callback.dto';
 import { GmailAuthService } from '../services/gmail-auth.service';
+import { GmailProcessingService } from '../services/gmail-processing.service';
 import { GmailWatchService } from '../services/gmail-watch.service';
 
 @Controller('auth/gmail')
@@ -10,6 +11,7 @@ export class GmailAuthController {
   constructor(
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailWatchService: GmailWatchService,
+    private readonly processingService: GmailProcessingService,
   ) { }
 
   /**
@@ -53,6 +55,24 @@ export class GmailAuthController {
   async getStatus(@Req() req: Request): Promise<{ gmailEmail: string | null }> {
     const userId = (req.user as { userId: number }).userId;
     return this.gmailAuthService.getGmailStatus(userId);
+  }
+
+  /**
+   * Opt-in catch-up of the last few days of mail, for after a (re)connect.
+   * Starts in the background and answers at once; the results arrive as
+   * proposals (GET /pending-actions), never as silent edits to the table.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('backfill')
+  @HttpCode(202)
+  async backfill(@Req() req: Request): Promise<{ status: 'started' }> {
+    const userId = (req.user as { userId: number }).userId;
+    // 409 GMAIL_RECONNECT_REQUIRED here, before anything starts, if Gmail isn't usable.
+    await this.gmailAuthService.getValidToken(userId);
+    if (!this.processingService.tryStartBackfill(userId)) {
+      throw new HttpException('A backfill ran recently — try again in a few minutes', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    return { status: 'started' };
   }
 
   @UseGuards(JwtAuthGuard)

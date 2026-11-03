@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
+import { BackoffOptions, HTTP_TIMEOUT_MS, retryWithBackoff } from '../../common/resilience';
 import { ParsedEmail } from '../../emails/interfaces/email.interface';
 import { GMAIL_URLS } from '../constants/urls';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
@@ -16,10 +17,32 @@ import { GmailAuthService } from './gmail-auth.service';
 export class GmailApiService {
   private readonly logger = new Logger(GmailApiService.name);
 
+  /** Retry policy for Gmail reads. Public-ish so tests can swap the sleep. */
+  private readonly backoff: BackoffOptions = {
+    // status/code only: the axios error's `config` carries the Bearer header.
+    onRetry: (err, attempt, delayMs) => {
+      const e = err as { code?: string; response?: { status?: number } };
+      this.logger.warn(`Gmail request failed (${e?.response?.status ?? e?.code ?? 'unknown'}), retry ${attempt} in ${delayMs}ms`);
+    },
+  };
+
   constructor(
     private readonly httpService: HttpService,
     private readonly gmailAuthService: GmailAuthService,
   ) { }
+
+  private get<T>(url: string, token: string, params?: Record<string, unknown>): Promise<{ data: T }> {
+    return retryWithBackoff(
+      () => firstValueFrom(
+        this.httpService.get<T>(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          ...(params && { params }),
+          timeout: HTTP_TIMEOUT_MS.gmail,
+        }),
+      ),
+      this.backoff,
+    );
+  }
 
   async getNewMessageIds(userId: number, startHistoryId: string): Promise<string[]> {
     const token = await this.gmailAuthService.getValidToken(userId);
@@ -30,12 +53,11 @@ export class GmailApiService {
       // history.list is paginated; stopping at the first page would drop the
       // rest while the caller still moves the cursor past them.
       do {
-        const response = await firstValueFrom(
-          this.httpService.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { startHistoryId, historyTypes: 'messageAdded', ...(pageToken && { pageToken }) },
-          }),
-        );
+        const response = await this.get<GmailHistoryResponse>(`${GMAIL_URLS.API_BASE}/history`, token, {
+          startHistoryId,
+          historyTypes: 'messageAdded',
+          ...(pageToken && { pageToken }),
+        });
         for (const record of response.data.history ?? []) {
           for (const added of record.messagesAdded ?? []) messageIds.add(added.message.id);
         }
@@ -66,14 +88,19 @@ export class GmailApiService {
     return ids;
   }
 
+  /** Ids of mail from the last `days` days, capped at `max`, oldest first (Gmail lists newest first). */
+  async listRecentMessageIds(userId: number, days: number, max: number): Promise<string[]> {
+    const token = await this.gmailAuthService.getValidToken(userId);
+    const response = await this.get<GmailMessageListResponse>(GMAIL_URLS.MESSAGES, token, {
+      q: `newer_than:${days}d`,
+      maxResults: max,
+    });
+    return (response.data.messages ?? []).map((m) => m.id).reverse();
+  }
+
   async fetchMessage(userId: number, messageId: string): Promise<ParsedEmail> {
     const token = await this.gmailAuthService.getValidToken(userId);
-    const response = await firstValueFrom(
-      this.httpService.get<GmailMessageDetail>(`${GMAIL_URLS.MESSAGES}/${messageId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { format: 'full' },
-      }),
-    );
+    const response = await this.get<GmailMessageDetail>(`${GMAIL_URLS.MESSAGES}/${messageId}`, token, { format: 'full' });
     return this.parseMessage(response.data);
   }
 

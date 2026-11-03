@@ -1,3 +1,4 @@
+import { ApplicationStatus } from '../../applications/enums/application-status.enum';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import { GmailProcessingService } from './gmail-processing.service';
 
@@ -201,6 +202,95 @@ describe('GmailProcessingService: message handling policy', () => {
     return { service, userService, gmailApiService, classificationService, jobSearchService, pendingActionsService };
   };
 
+  describe('failures', () => {
+    it('stops and keeps the cursor when Gmail rate-limits mid-batch, instead of dropping the remaining messages one by one', async () => {
+      const fetchMessage = jest.fn()
+        .mockResolvedValueOnce(email('m1'))
+        .mockRejectedValueOnce(http(429));
+      const { service, userService, classificationService } = build({ ids: ['m1', 'm2', 'm3'], fetchMessage });
+
+      await expect(service.processNotification('me@gmail.com', '200')).rejects.toMatchObject({ response: { status: 429 } });
+
+      expect(fetchMessage).toHaveBeenCalledTimes(2); // m3 was never attempted
+      expect(classificationService.classify).toHaveBeenCalledTimes(1);
+      expect(userService.updateGmailHistoryId).not.toHaveBeenCalled();
+    });
+
+    it('treats a rate-limited classifier call the same way', async () => {
+      const { service, userService } = build({ classify: jest.fn().mockRejectedValue(http(429)) });
+
+      await expect(service.processNotification('me@gmail.com', '200')).rejects.toMatchObject({ response: { status: 429 } });
+
+      expect(userService.updateGmailHistoryId).not.toHaveBeenCalled();
+    });
+
+    it('skips a message that fails for its own reasons and carries on, so one bad message cannot block the mailbox', async () => {
+      const fetchMessage = jest.fn()
+        .mockRejectedValueOnce(http(500))
+        .mockResolvedValueOnce(email('m2'));
+      const { service, userService, classificationService } = build({ ids: ['m1', 'm2'], fetchMessage });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(classificationService.classify).toHaveBeenCalledTimes(1); // m2
+      expect(userService.updateGmailHistoryId).toHaveBeenCalledWith(3, '200');
+    });
+
+    it('says plainly in the log when a message is skipped', async () => {
+      const { service } = build({ fetchMessage: jest.fn().mockRejectedValue(http(404)) });
+      const error = jest.spyOn((service as any).logger, 'error');
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(error).toHaveBeenCalledWith(expect.stringMatching(/m1.*skipped/s));
+    });
+  });
+
+  describe('automatic changes', () => {
+    const linked = (status: string) => ({ jobId: 9, companyName: 'Acme', status });
+
+    it.each([
+      ApplicationStatus.REJECTED,
+      ApplicationStatus.CONTRACT_ACCEPTED,
+      ApplicationStatus.ARCHIVED,
+      ApplicationStatus.PASSED,
+    ])('never touches an application the user has closed (%s)', async (status) => {
+      const { service, jobSearchService, pendingActionsService } = build({
+        linked: linked(status),
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.AWAITING_RESPONSE)),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+      expect(pendingActionsService.create).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the application already has the suggested status', async () => {
+      const { service, jobSearchService, pendingActionsService } = build({
+        linked: linked(ApplicationStatus.AWAITING_RESPONSE),
+        classify: jest.fn().mockResolvedValue(llm(ApplicationStatus.AWAITING_RESPONSE)),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+      expect(pendingActionsService.create).not.toHaveBeenCalled();
+    });
+
+    it('still auto-applies a clear rules match on an open application (unchanged behaviour)', async () => {
+      const { service, jobSearchService, pendingActionsService } = build({
+        linked: linked(ApplicationStatus.AWAITING_RESPONSE),
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(jobSearchService.setStatus).toHaveBeenCalledWith(3, 9, ApplicationStatus.REJECTED);
+      expect(pendingActionsService.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('stale pass', () => {
     it('lets a new notification take over a pass stuck for too long, and the stuck pass cannot release the new pass\'s lock', async () => {
       const gate = () => { let release!: () => void; const promise = new Promise<string[]>((r) => { release = () => r([]); }); return { promise, release }; };
@@ -229,6 +319,64 @@ describe('GmailProcessingService: message handling policy', () => {
       second.release();
       await takeover;
       expect(gmailApiService.getNewMessageIds).toHaveBeenCalledTimes(3); // the queued 400 ran as the follow-up
+      now.mockRestore();
+    });
+  });
+
+  describe('backfill', () => {
+    it('replays the recent mail oldest-first and only ever queues proposals, never edits the table', async () => {
+      const { service, jobSearchService, pendingActionsService, gmailApiService } = build({
+        ids: ['old', 'new'],
+        linked: { jobId: 9, companyName: 'Acme', status: ApplicationStatus.AWAITING_RESPONSE },
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)), // a rules match: live, this would auto-apply
+      });
+
+      await service.backfillRecent(3);
+
+      expect(gmailApiService.listRecentMessageIds).toHaveBeenCalledWith(3, 7, 50);
+      expect(gmailApiService.fetchMessage.mock.calls.map(([, id]: [number, string]) => id)).toEqual(['old', 'new']);
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+      expect(pendingActionsService.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('also queues, rather than applies, when the mail matches an application by company name', async () => {
+      const open = { jobId: 9, companyName: 'Acme', status: ApplicationStatus.AWAITING_RESPONSE };
+      const { service, jobSearchService, pendingActionsService } = build({
+        existing: open, // no linked thread: this goes through findMatchingApplication
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)),
+      });
+
+      await service.backfillRecent(3);
+
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+      expect(pendingActionsService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('control: the same company-name match from live mail still auto-applies', async () => {
+      const open = { jobId: 9, companyName: 'Acme', status: ApplicationStatus.AWAITING_RESPONSE };
+      const { service, jobSearchService, pendingActionsService } = build({
+        existing: open,
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(jobSearchService.setStatus).toHaveBeenCalledWith(3, 9, ApplicationStatus.REJECTED);
+      expect(pendingActionsService.create).not.toHaveBeenCalled();
+    });
+
+    it('allows one backfill per user per cooldown window', () => {
+      const { service } = build();
+      jest.spyOn(service, 'backfillRecent').mockResolvedValue(undefined);
+      const now = jest.spyOn(Date, 'now');
+
+      now.mockReturnValue(5_000_000);
+      expect(service.tryStartBackfill(3)).toBe(true);
+      now.mockReturnValue(5_000_000 + 60_000);
+      expect(service.tryStartBackfill(3)).toBe(false); // too soon
+      expect(service.tryStartBackfill(4)).toBe(true); // another user is unaffected
+      now.mockReturnValue(5_000_000 + 16 * 60_000);
+      expect(service.tryStartBackfill(3)).toBe(true);
       now.mockRestore();
     });
   });

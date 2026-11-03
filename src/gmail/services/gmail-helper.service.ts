@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { AxiosResponse } from "axios";
 import { firstValueFrom } from "rxjs";
 import { GOOGLE_TOKEN_URL } from "../../auth/constants";
+import { HTTP_TIMEOUT_MS } from '../../common/resilience';
 import { GMAIL_URLS } from "../constants/urls";
 import { GmailTokenResponse } from "../interfaces/gmail.interface";
 @Injectable()
@@ -25,6 +26,7 @@ export class GmailHelperService {
     return await firstValueFrom(
       this.httpService.get<{ emailAddress: string }>(GMAIL_URLS.PROFILE, {
         headers: { Authorization: `Bearer ${access_token}` },
+        timeout: HTTP_TIMEOUT_MS.google_oauth,
       }),
     )
   }
@@ -37,7 +39,7 @@ export class GmailHelperService {
         client_secret: this.clientSecret,
         redirect_uri: this.redirectUri,
         grant_type: 'authorization_code',
-      }),
+      }, { timeout: HTTP_TIMEOUT_MS.google_oauth }),
     )
   }
 
@@ -48,7 +50,7 @@ export class GmailHelperService {
         client_secret: this.clientSecret,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
-      }),
+      }, { timeout: HTTP_TIMEOUT_MS.google_oauth }),
     );
   }
 }

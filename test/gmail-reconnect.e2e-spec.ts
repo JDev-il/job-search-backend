@@ -13,6 +13,7 @@ import { GmailAuthController } from '../src/gmail/controllers/gmail-auth.control
 import { GMAIL_RECONNECT_REQUIRED } from '../src/gmail/exceptions/gmail-reconnect-required.exception';
 import { GmailAuthService } from '../src/gmail/services/gmail-auth.service';
 import { GmailHelperService } from '../src/gmail/services/gmail-helper.service';
+import { GmailProcessingService } from '../src/gmail/services/gmail-processing.service';
 import { GmailWatchService } from '../src/gmail/services/gmail-watch.service';
 import { UserService } from '../src/users/users.service';
 
@@ -93,6 +94,7 @@ describe('Gmail reconnect after invalid_grant', () => {
         { provide: ConfigService, useValue: { get: (k: string) => config[k] } },
         { provide: GmailHelperService, useValue: helper },
         { provide: GmailWatchService, useValue: gmailWatchService },
+        { provide: GmailProcessingService, useValue: {} }, // only used by the backfill endpoint, which this spec doesn't touch
         { provide: UserService, useValue: userService },
         { provide: HttpService, useValue: {} }, // only used by disconnect, which this spec doesn't touch
       ],

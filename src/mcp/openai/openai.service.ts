@@ -1,12 +1,22 @@
 import { HttpService } from "@nestjs/axios";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { firstValueFrom } from "rxjs";
+import { BackoffOptions, HTTP_TIMEOUT_MS, retryWithBackoff } from "../../common/resilience";
 
 @Injectable()
 export class OpenAIService {
   private readonly apiKey: string;
   private readonly apiUrl = 'https://api.openai.com/v1/chat/completions';
+  private readonly logger = new Logger(OpenAIService.name);
+
+  /** Retry policy for the API call (rate limits, 5xx, dropped connections). Public-ish so tests can swap the sleep. */
+  private readonly backoff: BackoffOptions = {
+    onRetry: (err, attempt, delayMs) => {
+      const e = err as { code?: string; response?: { status?: number } };
+      this.logger.warn(`OpenAI request failed (${e?.response?.status ?? e?.code ?? 'unknown'}), retry ${attempt} in ${delayMs}ms`);
+    },
+  };
 
   constructor(
     private readonly httpService: HttpService,
@@ -27,9 +37,7 @@ export class OpenAIService {
       messages,
     };
 
-    const response = await firstValueFrom(
-      this.httpService.post(this.apiUrl, body, { headers })
-    );
+    const response = await this.post(body, headers);
 
     return response.data.choices[0].message.content;
   }
@@ -46,10 +54,15 @@ export class OpenAIService {
       response_format: { type: 'json_object' },
     };
 
-    const response = await firstValueFrom(
-      this.httpService.post(this.apiUrl, body, { headers })
-    );
+    const response = await this.post(body, headers);
 
     return JSON.parse(response.data.choices[0].message.content) as T;
+  }
+
+  private post(body: unknown, headers: Record<string, string>) {
+    return retryWithBackoff(
+      () => firstValueFrom(this.httpService.post(this.apiUrl, body, { headers, timeout: HTTP_TIMEOUT_MS.llm })),
+      this.backoff,
+    );
   }
 }

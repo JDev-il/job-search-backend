@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ApplicationStatus, TERMINAL_STATUSES } from '../../applications/enums/application-status.enum';
+import { isRateLimited } from '../../common/resilience';
 import { EmailIntent } from '../../emails/enums/email.enum';
 import { EmailClassificationResult, ParsedEmail } from '../../emails/interfaces/email.interface';
 import { EmailClassificationService } from '../../emails/services/email-classification.service';
@@ -13,10 +15,16 @@ import { PendingActionsService } from '../../pending-actions/services/pending-ac
 import { UserService } from '../../users/users.service';
 import { ATS_DOMAINS } from '../constants/gmail-data';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
+import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
 import { GmailApiService } from './gmail-api.service';
 
 /** A pass that has run this long is presumed stuck; a new notification may start its own. */
 const STALE_PASS_MS = 20 * 60_000;
+
+/** On-demand catch-up of recent mail (see backfillRecent). */
+const BACKFILL_DAYS = 7;
+const BACKFILL_MAX_MESSAGES = 50;
+const BACKFILL_COOLDOWN_MS = 15 * 60_000;
 
 @Injectable()
 export class GmailProcessingService {
@@ -111,9 +119,28 @@ export class GmailProcessingService {
     }
     this.logger.log(`Processing ${messageIds.length} new message(s) for user ${user.userId}`);
 
+    await this.processMessages(user.userId, messageIds);
+
+    await this.userService.updateGmailHistoryId(user.userId, newHistoryId);
+  }
+
+  /**
+   * Fetch, classify and route each message in order.
+   *
+   * A message that fails for its own reasons is logged and skipped, so one bad
+   * message can never block a mailbox. A rate limit is different: it is ours,
+   * it is temporary, and every message after this one would fail the same way,
+   * so the batch stops and the error propagates. The caller then leaves the
+   * history cursor where it was and the range is read again on the next push.
+   */
+  private async processMessages(
+    userId: number,
+    messageIds: string[],
+    options: { queueOnly?: boolean } = {},
+  ): Promise<void> {
     for (const messageId of messageIds) {
       try {
-        const parsedEmail = await this.gmailApiService.fetchMessage(user.userId, messageId);
+        const parsedEmail = await this.gmailApiService.fetchMessage(userId, messageId);
         // Never log message content (subject/body): it is restricted Gmail
         // user data and the server logs are not a place it should end up.
         this.logger.debug(
@@ -126,9 +153,13 @@ export class GmailProcessingService {
         );
 
         if (result.suggestedStatus && parsedEmail.senderDomain) {
-          await this.routeClassifiedEmail(user.userId, parsedEmail, result);
+          await this.routeClassifiedEmail(userId, parsedEmail, result, options.queueOnly);
         }
       } catch (err) {
+        if (isRateLimited(err)) {
+          this.logger.warn(`Rate limited while processing message ${messageId} — stopping this batch here`);
+          throw err;
+        }
         const e = err as { message?: string; response?: { status?: number; data?: unknown }; config?: { url?: string } };
         const status = e.response?.status;
         const data = e.response?.data;
@@ -136,12 +167,48 @@ export class GmailProcessingService {
         this.logger.error(
           `Failed to process message ${messageId}: ${e.message ?? err}` +
           (status ? ` [HTTP ${status} from ${url}]` : '') +
-          (data ? ` body=${JSON.stringify(data)}` : ''),
+          (data ? ` body=${JSON.stringify(data)}` : '') +
+          ' — skipped',
         );
       }
     }
+  }
 
-    await this.userService.updateGmailHistoryId(user.userId, newHistoryId);
+  private readonly backfillStartedAt = new Map<number, number>();
+
+  /**
+   * Starts a backfill in the background unless this user ran one recently.
+   * Returns false when it is too soon. Process-local, like the other guards.
+   */
+  public tryStartBackfill(userId: number): boolean {
+    const last = this.backfillStartedAt.get(userId);
+    if (last !== undefined && Date.now() - last < BACKFILL_COOLDOWN_MS) return false;
+    this.backfillStartedAt.set(userId, Date.now());
+
+    this.backfillRecent(userId).catch((err) => {
+      if (err instanceof GmailReconnectRequiredException) {
+        this.logger.warn(`Backfill for user ${userId} skipped: Gmail needs to be reconnected`);
+        return;
+      }
+      this.logger.error(`Backfill for user ${userId} failed: ${err?.message ?? err}`);
+    });
+    return true;
+  }
+
+  /**
+   * Catch up on the last few days of mail, e.g. after Gmail was reconnected
+   * (the history cursor restarts from "now" then, so anything in between is
+   * never read). Opt-in: nothing calls this automatically, because it spends
+   * a classification per message.
+   *
+   * Replays oldest-first, so the newest email is seen last, and only ever
+   * queues proposals: old mail must not silently overwrite what the user has
+   * set by hand since.
+   */
+  public async backfillRecent(userId: number): Promise<void> {
+    const messageIds = await this.gmailApiService.listRecentMessageIds(userId, BACKFILL_DAYS, BACKFILL_MAX_MESSAGES);
+    this.logger.log(`Backfill for user ${userId}: ${messageIds.length} message(s) from the last ${BACKFILL_DAYS} days, proposals only`);
+    await this.processMessages(userId, messageIds, { queueOnly: true });
   }
 
   /**
@@ -158,6 +225,7 @@ export class GmailProcessingService {
     userId: number,
     email: ParsedEmail,
     result: EmailClassificationResult,
+    queueOnly = false,
   ): Promise<void> {
     const senderDomain = email.senderDomain!;
     const suggestedStatus = result.suggestedStatus!;
@@ -167,7 +235,7 @@ export class GmailProcessingService {
     if (email.threadId) {
       const linked = await this.jobSearchService.findByThreadId(userId, email.threadId);
       if (linked) {
-        await this.proposeOrApplyStatusChange(userId, email, result, linked, /*forceQueue*/ false);
+        await this.proposeOrApplyStatusChange(userId, email, result, linked, /*forceQueue*/ queueOnly);
         return;
       }
     }
@@ -182,7 +250,7 @@ export class GmailProcessingService {
 
     if (existing) {
       // Force queue when LLM was the source — we don't auto-apply lower-confidence calls.
-      const forceQueue = result.source === 'llm';
+      const forceQueue = result.source === 'llm' || queueOnly;
       await this.proposeOrApplyStatusChange(userId, email, result, existing, forceQueue);
       return;
     }
@@ -210,6 +278,19 @@ export class GmailProcessingService {
     forceQueue: boolean,
   ): Promise<void> {
     const suggestedStatus = result.suggestedStatus!;
+    const current = target.status as ApplicationStatus;
+
+    // Same rule the accept path enforces: a closed application is reopened by
+    // the user, never by an email. (Queueing would only make a proposal that
+    // can't be accepted.)
+    if (TERMINAL_STATUSES.has(current)) {
+      this.logger.log(`Skipped job ${target.jobId} (${target.companyName}): already closed (${current})`);
+      return;
+    }
+    if (current === suggestedStatus) {
+      this.logger.log(`Skipped job ${target.jobId} (${target.companyName}): already ${current}`);
+      return;
+    }
 
     if (!forceQueue && result.source === 'rules') {
       // Rules path: status came from the deterministic INTENT_TO_STATUS table
