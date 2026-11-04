@@ -323,6 +323,55 @@ describe('GmailProcessingService: message handling policy', () => {
     });
   });
 
+  describe('catch-up pass (queueOnly)', () => {
+    const open = { jobId: 9, companyName: 'Acme', status: ApplicationStatus.AWAITING_RESPONSE };
+    const gate = () => { let release!: () => void; const promise = new Promise<string[]>((r) => { release = () => r([]); }); return { promise, release }; };
+
+    it('only queues proposals, never edits the table, and still moves the cursor', async () => {
+      const { service, userService, jobSearchService, pendingActionsService } = build({
+        linked: open,
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)), // live, this would auto-apply
+      });
+
+      await service.processNotification('me@gmail.com', '500', { queueOnly: true });
+
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+      expect(pendingActionsService.create).toHaveBeenCalledTimes(1);
+      expect(userService.updateGmailHistoryId).toHaveBeenCalledWith(3, '500');
+    });
+
+    it('has nothing to add to a pass that is already running: it neither starts another nor leaves a follow-up', async () => {
+      const first = gate();
+      const { service, gmailApiService } = build();
+      gmailApiService.getNewMessageIds.mockReturnValueOnce(first.promise).mockResolvedValue([]);
+
+      const running = service.processNotification('me@gmail.com', '200');
+      await Promise.resolve();
+      await service.processNotification('me@gmail.com', '300', { queueOnly: true });
+      first.release();
+      await running;
+
+      expect(gmailApiService.getNewMessageIds).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not make a push that arrives meanwhile queue-only: its follow-up pass is live', async () => {
+      const first = gate();
+      const { service, gmailApiService, jobSearchService } = build({
+        linked: open,
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)),
+      });
+      gmailApiService.getNewMessageIds.mockReturnValueOnce(first.promise).mockResolvedValue(['m1']);
+
+      const catchUp = service.processNotification('me@gmail.com', '200', { queueOnly: true });
+      await Promise.resolve();
+      await service.processNotification('me@gmail.com', '300'); // a real push, queued behind the catch-up
+      first.release();
+      await catchUp;
+
+      expect(jobSearchService.setStatus).toHaveBeenCalledWith(3, 9, ApplicationStatus.REJECTED);
+    });
+  });
+
   describe('backfill', () => {
     it('replays the recent mail oldest-first and only ever queues proposals, never edits the table', async () => {
       const { service, jobSearchService, pendingActionsService, gmailApiService } = build({

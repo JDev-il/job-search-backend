@@ -58,12 +58,21 @@ export class GmailProcessingService {
    * Requests have timeouts, so a pass normally ends. If one is still "running"
    * after STALE_PASS_MS anyway, it is presumed stuck and the next notification
    * takes over rather than queueing behind it forever.
+   *
+   * `queueOnly` marks a catch-up pass (see GmailCatchUpService): it only ever
+   * queues proposals. It applies to that pass alone, since anything that
+   * queued up behind it came from real pushes. And a catch-up has nothing to
+   * add to a pass that is already running, so it drops out instead of queueing.
    */
-  public async processNotification(emailAddress: string, newHistoryId: string): Promise<void> {
+  public async processNotification(
+    emailAddress: string,
+    newHistoryId: string,
+    options: { queueOnly?: boolean } = {},
+  ): Promise<void> {
     const key = (emailAddress ?? '').toLowerCase();
     const current = this.running.get(key);
     if (current && Date.now() - current.startedAt < STALE_PASS_MS) {
-      this.queued.set(key, newHistoryId);
+      if (!options.queueOnly) this.queued.set(key, newHistoryId);
       return;
     }
     if (current) {
@@ -74,9 +83,11 @@ export class GmailProcessingService {
     this.running.set(key, mine);
     try {
       let next: string | undefined = newHistoryId;
+      let passOptions = options;
       while (next !== undefined) {
         this.queued.delete(key);
-        await this.processOnce(emailAddress, next);
+        await this.processOnce(emailAddress, next, passOptions);
+        passOptions = {};
         if (this.running.get(key) !== mine) break; // taken over while stuck: the newer pass owns the queue now
         next = this.queued.get(key);
       }
@@ -90,7 +101,7 @@ export class GmailProcessingService {
     }
   }
 
-  private async processOnce(emailAddress: string, newHistoryId: string): Promise<void> {
+  private async processOnce(emailAddress: string, newHistoryId: string, options: { queueOnly?: boolean }): Promise<void> {
     const user = await this.userService.findByGmailEmail(emailAddress);
     if (!user) {
       this.logger.warn(`No user found for Gmail address: ${emailAddress}`);
@@ -119,7 +130,7 @@ export class GmailProcessingService {
     }
     this.logger.log(`Processing ${messageIds.length} new message(s) for user ${user.userId}`);
 
-    await this.processMessages(user.userId, messageIds);
+    await this.processMessages(user.userId, messageIds, options);
 
     await this.userService.updateGmailHistoryId(user.userId, newHistoryId);
   }

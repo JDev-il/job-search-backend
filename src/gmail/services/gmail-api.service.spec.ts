@@ -138,4 +138,25 @@ describe('GmailApiService.getNewMessageIds', () => {
       await expect(service.listRecentMessageIds(3, 7, 50)).resolves.toEqual([]);
     });
   });
+
+  describe('getCurrentHistoryId (catch-up)', () => {
+    it('reads the mailbox\'s current historyId from the profile, with a timeout', async () => {
+      httpService.get.mockReturnValue(of({ data: { emailAddress: 'me@gmail.com', messagesTotal: 10, threadsTotal: 4, historyId: '777' } }));
+
+      await expect(service.getCurrentHistoryId(3)).resolves.toBe('777');
+
+      expect(httpService.get.mock.calls[0][0]).toBe('https://gmail.googleapis.com/gmail/v1/users/me/profile');
+      expect(httpService.get.mock.calls[0][1].headers.Authorization).toBe('Bearer access-token');
+      expect(httpService.get.mock.calls[0][1].timeout).toBe(30_000);
+    });
+
+    it('retries a transient failure like every other Gmail read', async () => {
+      httpService.get
+        .mockReturnValueOnce(throwError(() => Object.assign(new Error('status 503'), { response: { status: 503 } })))
+        .mockReturnValueOnce(of({ data: { historyId: '778' } }));
+
+      await expect(service.getCurrentHistoryId(3)).resolves.toBe('778');
+      expect(httpService.get).toHaveBeenCalledTimes(2);
+    });
+  });
 });

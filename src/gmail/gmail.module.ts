@@ -11,6 +11,7 @@ import { GmailAuthController } from './controllers/gmail-auth.controller';
 import { GmailWebhookController } from './controllers/gmail-webhook.controller';
 import { GmailApiService } from './services/gmail-api.service';
 import { GmailAuthService } from './services/gmail-auth.service';
+import { GmailCatchUpService } from './services/gmail-catch-up.service';
 import { GmailProcessingService } from './services/gmail-processing.service';
 import { GmailWatchService } from './services/gmail-watch.service';
 
@@ -32,7 +33,7 @@ import { GmailWatchService } from './services/gmail-watch.service';
     PendingActionsModule,
   ],
   controllers: [GmailAuthController, GmailWebhookController],
-  providers: [GmailAuthService, GmailApiService, GmailWatchService, GmailProcessingService, GmailHelperService],
+  providers: [GmailAuthService, GmailApiService, GmailWatchService, GmailProcessingService, GmailCatchUpService, GmailHelperService],
   exports: [GmailAuthService, GmailApiService, GmailWatchService, GmailProcessingService],
 })
 export class GmailModule {}

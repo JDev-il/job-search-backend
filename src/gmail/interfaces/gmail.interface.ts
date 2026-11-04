@@ -67,6 +67,14 @@ export interface GmailHistoryResponse {
   nextPageToken?: string;
 }
 
+// users.getProfile: `historyId` is the mailbox's current history id
+export interface GmailProfileResponse {
+  emailAddress: string;
+  messagesTotal?: number;
+  threadsTotal?: number;
+  historyId: string;
+}
+
 // Gmail Watch API
 export interface GmailWatchResponse {
   historyId: string;

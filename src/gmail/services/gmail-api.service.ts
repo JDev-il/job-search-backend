@@ -11,6 +11,7 @@ import {
   GmailMessageHeader,
   GmailMessageListResponse,
   GmailMessagePart,
+  GmailProfileResponse,
 } from '../interfaces/gmail.interface';
 import { GmailAuthService } from './gmail-auth.service';
 @Injectable()
@@ -96,6 +97,17 @@ export class GmailApiService {
       maxResults: max,
     });
     return (response.data.messages ?? []).map((m) => m.id).reverse();
+  }
+
+  /**
+   * The mailbox's current history id (users.getProfile, 1 quota unit). A
+   * catch-up pass compares it with the stored cursor: equal means nothing has
+   * changed, so history.list isn't called at all.
+   */
+  async getCurrentHistoryId(userId: number): Promise<string> {
+    const token = await this.gmailAuthService.getValidToken(userId);
+    const response = await this.get<GmailProfileResponse>(GMAIL_URLS.PROFILE, token);
+    return response.data.historyId;
   }
 
   async fetchMessage(userId: number, messageId: string): Promise<ParsedEmail> {
