@@ -346,6 +346,41 @@ describe('GmailProcessingService: message handling policy', () => {
     });
   });
 
+  describe('which company a sender is matched against', () => {
+    const open = { jobId: 9, companyName: 'Acme', status: ApplicationStatus.AWAITING_RESPONSE };
+
+    const matchedAgainst = async (senderDomain: string) => {
+      const { service, jobSearchService } = build({
+        fetchMessage: jest.fn().mockResolvedValue(email('m1', { senderDomain })),
+        existing: open,
+        classify: jest.fn().mockResolvedValue(rules(ApplicationStatus.REJECTED)),
+      });
+      await service.processNotification('me@gmail.com', '200');
+      return jobSearchService.findMatchingApplication.mock.calls[0]?.[1];
+    };
+
+    it.each([
+      ['careers.acme.com', 'acme'],
+      ['acme.co.il', 'acme'],
+      ['jobs.acme.co.il', 'acme'],
+      ['mail.acme.co.uk', 'acme'],
+      ['recruiting.acme.com.au', 'acme'],
+    ])('%s is looked up as "%s" (never "co" or "com", which would match almost any application)', async (domain, expected) => {
+      expect(await matchedAgainst(domain)).toBe(expected);
+    });
+
+    it('proposes the real company for a new application on a two-part domain', async () => {
+      const { service, pendingActionsService } = build({
+        fetchMessage: jest.fn().mockResolvedValue(email('m1', { senderDomain: 'hr.newco.co.il' })),
+        classify: jest.fn().mockResolvedValue({ intent: 'confirmation', confidence: 0.9, source: 'rules', suggestedStatus: ApplicationStatus.AWAITING_RESPONSE }),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(pendingActionsService.create).toHaveBeenCalledWith(expect.objectContaining({ question: expect.stringContaining('"newco"') }));
+    });
+  });
+
   describe('stale pass', () => {
     it('lets a new notification take over a pass stuck for too long, and the stuck pass cannot release the new pass\'s lock', async () => {
       const gate = () => { let release!: () => void; const promise = new Promise<string[]>((r) => { release = () => r([]); }); return { promise, release }; };

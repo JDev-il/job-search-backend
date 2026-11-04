@@ -16,6 +16,7 @@ import { UserService } from '../../users/users.service';
 import { ATS_DOMAINS, JOB_BOARD_DOMAINS } from '../constants/gmail-data';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
+import { extractCompanyName } from '../utils/company-name';
 import { GmailApiService } from './gmail-api.service';
 
 /** A pass that has run this long is presumed stuck; a new notification may start its own. */
@@ -262,7 +263,7 @@ export class GmailProcessingService {
       return;
     }
 
-    const companyName = this.extractCompanyName(senderDomain);
+    const companyName = extractCompanyName(senderDomain);
     const existing = await this.jobSearchService.findMatchingApplication(userId, companyName);
 
     if (existing) {
@@ -453,11 +454,5 @@ export class GmailProcessingService {
   private inDomains(domain: string, list: readonly string[]): boolean {
     const lower = domain.toLowerCase();
     return list.some(d => lower === d || lower.endsWith(`.${d}`));
-  }
-
-  /** amazon.co.uk → amazon, mail.google.com → google */
-  private extractCompanyName(domain: string): string {
-    const parts = domain.split('.');
-    return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
   }
 }
