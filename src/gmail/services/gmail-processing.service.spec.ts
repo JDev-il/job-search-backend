@@ -202,6 +202,61 @@ describe('GmailProcessingService: message handling policy', () => {
     return { service, userService, gmailApiService, classificationService, jobSearchService, pendingActionsService };
   };
 
+  describe('which mail may reach the model', () => {
+    // The model is only for mail the rules could not settle. Mail the rules
+    // saw nothing in is sent to it only when the sender is a platform that
+    // really carries application mail (ATS, HR, assessment), not a job board.
+    const allowedFor = async (senderDomain?: string) => {
+      const { service, classificationService } = build({
+        fetchMessage: jest.fn().mockResolvedValue(email('m1', { senderDomain })),
+      });
+      await service.processNotification('me@gmail.com', '200');
+      return classificationService.classify.mock.calls[0][1]?.llmWithoutRuleMatch;
+    };
+
+    it.each(['greenhouse.io', 'eu.lever.co', 'myworkdayjobs.com', 'hackerrank.com', 'comeet-notifications.com'])(
+      'allows it for the platform %s',
+      async (domain) => expect(await allowedFor(domain)).toBe(true),
+    );
+
+    it.each(['acme.com', 'google.com', 'accounts.google.com', 'github.com'])(
+      'holds it for the ordinary sender %s',
+      async (domain) => expect(await allowedFor(domain)).toBe(false),
+    );
+
+    it.each(['indeed.com', 'il.indeed.com', 'linkedin.com', 'glassdoor.com', 'alljobs.co.il', 'drushim.co.il', 'jobmaster.co.il'])(
+      'holds it for the job board %s: alerts and chat notices, not applications',
+      async (domain) => expect(await allowedFor(domain)).toBe(false),
+    );
+
+    it('holds it for a look-alike of a platform domain', async () => {
+      expect(await allowedFor('evilgreenhouse.io')).toBe(false);
+    });
+
+    it('holds it when the sender has no domain', async () => {
+      expect(await allowedFor(undefined)).toBe(false);
+    });
+
+    it('does nothing with a mail the model was not allowed to read: no proposal, no edit', async () => {
+      const { service, pendingActionsService, jobSearchService } = build({
+        classify: jest.fn().mockResolvedValue({ intent: 'unknown', confidence: 0, source: 'rules' }),
+      });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect(pendingActionsService.create).not.toHaveBeenCalled();
+      expect(jobSearchService.setStatus).not.toHaveBeenCalled();
+    });
+
+    it('logs where each answer came from (counts only, never content), so held mail can be measured', async () => {
+      const { service } = build({ classify: jest.fn().mockResolvedValue({ intent: 'unknown', confidence: 0, source: 'rules' }) });
+
+      await service.processNotification('me@gmail.com', '200');
+
+      expect((service as any).logger.log).toHaveBeenCalledWith(expect.stringMatching(/\[m1\].*source=rules.*domain=acme\.com/));
+    });
+  });
+
   describe('failures', () => {
     it('stops and keeps the cursor when Gmail rate-limits mid-batch, instead of dropping the remaining messages one by one', async () => {
       const fetchMessage = jest.fn()

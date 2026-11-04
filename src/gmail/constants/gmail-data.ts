@@ -1,4 +1,20 @@
 /**
+ * Job boards. They are routed like the platforms below (the sender's domain
+ * says nothing about the employer), but unlike them most of what they send is
+ * alerts and chat notices, not application mail. So the LLM is not shown mail
+ * from them unless the rules already found something in it.
+ */
+export const JOB_BOARD_DOMAINS: readonly string[] = [
+  'indeed.com',
+  'linkedin.com',
+  'linkedin.cn',
+  'glassdoor.com',
+  'alljobs.co.il',
+  'drushim.co.il',
+  'jobmaster.co.il',
+];
+
+/**
  * Platforms whose sender domains carry no useful employer signal — the company
  * name must be extracted from the From display-name or Subject instead.
  * Emails from these domains always route to LINK_THREAD_TO_APPLICATION
@@ -34,16 +50,8 @@ export const ATS_DOMAINS: readonly string[] = [
   // ── HR platforms that send recruitment emails ────────────────────────────
   'hibob.com',
 
-  // ── Job boards ───────────────────────────────────────────────────────────
-  'indeed.com',
-  'linkedin.com',
-  'linkedin.cn',
-  'glassdoor.com',
-
-  // ── Israeli job boards ───────────────────────────────────────────────────
-  'alljobs.co.il',
-  'drushim.co.il',
-  'jobmaster.co.il',
+  // ── Job boards (see JOB_BOARD_DOMAINS) ───────────────────────────────────
+  ...JOB_BOARD_DOMAINS,
 
   // ── Assessment & interview platforms ────────────────────────────────────
   'hackerrank.com',

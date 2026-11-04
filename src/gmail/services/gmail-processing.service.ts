@@ -13,7 +13,7 @@ import {
 } from '../../pending-actions/interfaces/pending-action.interface';
 import { PendingActionsService } from '../../pending-actions/services/pending-actions.service';
 import { UserService } from '../../users/users.service';
-import { ATS_DOMAINS } from '../constants/gmail-data';
+import { ATS_DOMAINS, JOB_BOARD_DOMAINS } from '../constants/gmail-data';
 import { GmailHistoryExpiredException } from '../exceptions/gmail-history-expired.exception';
 import { GmailReconnectRequiredException } from '../exceptions/gmail-reconnect-required.exception';
 import { GmailApiService } from './gmail-api.service';
@@ -157,10 +157,16 @@ export class GmailProcessingService {
         this.logger.debug(
           `[${messageId}] fetched: senderDomain=${parsedEmail.senderDomain ?? 'n/a'}, bodyChars=${parsedEmail.bodyText.length}`,
         );
-        const result = await this.classificationService.classify(parsedEmail);
+        // Mail the rules saw nothing in reaches the model only from a platform
+        // that carries application mail. Everything else (security alerts,
+        // receipts, newsletters, job-board alerts) is answered by the rules alone.
+        const result = await this.classificationService.classify(parsedEmail, {
+          llmWithoutRuleMatch: this.isApplicationPlatform(parsedEmail.senderDomain),
+        });
 
+        // `source` tells held mail (rules) from model answers (llm), for counting.
         this.logger.log(
-          `[${messageId}] intent=${result.intent}, status=${result.suggestedStatus}, domain=${parsedEmail.senderDomain}`,
+          `[${messageId}] intent=${result.intent}, status=${result.suggestedStatus}, source=${result.source}, domain=${parsedEmail.senderDomain}`,
         );
 
         if (result.suggestedStatus && parsedEmail.senderDomain) {
@@ -435,8 +441,18 @@ export class GmailProcessingService {
   }
 
   private isAtsDomain(domain: string): boolean {
+    return this.inDomains(domain, ATS_DOMAINS);
+  }
+
+  /** An ATS, HR or assessment platform: a sender whose mail is worth a model call even when no rule matched. */
+  private isApplicationPlatform(domain: string | undefined): boolean {
+    if (!domain) return false;
+    return this.isAtsDomain(domain) && !this.inDomains(domain, JOB_BOARD_DOMAINS);
+  }
+
+  private inDomains(domain: string, list: readonly string[]): boolean {
     const lower = domain.toLowerCase();
-    return ATS_DOMAINS.some(ats => lower === ats || lower.endsWith(`.${ats}`));
+    return list.some(d => lower === d || lower.endsWith(`.${d}`));
   }
 
   /** amazon.co.uk → amazon, mail.google.com → google */

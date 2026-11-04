@@ -75,6 +75,17 @@ export interface EmailClassificationResult {
 }
 
 
+export interface ClassifyOptions {
+  /**
+   * May the LLM read a mail in which the rule engine found nothing at all?
+   * Defaults to true (the manual /classify endpoint relies on it). A caller
+   * that reads a whole mailbox passes false for senders it has no reason to
+   * trust, so noise (security alerts, receipts, newsletters) never leaves
+   * the server. Mail the rules matched but could not settle is unaffected.
+   */
+  llmWithoutRuleMatch?: boolean;
+}
+
 // Cache entry
 export interface EmailClassificationCacheEntry {
   fingerprint: string;

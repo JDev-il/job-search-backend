@@ -237,6 +237,47 @@ describe('EmailClassificationService', () => {
       expect(result.suggestedStatus).toBeUndefined();
     });
 
+    describe('when the caller does not allow the LLM for mail without a rule match', () => {
+      const held = { llmWithoutRuleMatch: false };
+
+      it('keeps unmatched mail away from the LLM and answers from the rules: unknown, no status', async () => {
+        const result = await service.classify(SAMPLES.irrelevantNoise, held);
+
+        expect(llmService.classify).not.toHaveBeenCalled();
+        expect(result.source).toBe('rules');
+        expect(result.intent).toBe(EmailIntent.UNKNOWN);
+        expect(result.suggestedStatus).toBeUndefined();
+      });
+
+      it('still escalates a mail the rules matched but could not settle', async () => {
+        llmService.classify.mockResolvedValueOnce(makeLlmResult());
+
+        await service.classify(SAMPLES.ambiguousPolite, held);
+
+        expect(llmService.classify).toHaveBeenCalledTimes(1);
+      });
+
+      it('still escalates a mail whose only evidence is the subject (an ATS thank-you)', async () => {
+        llmService.classify.mockResolvedValueOnce(makeLlmResult());
+
+        await service.classify(
+          { subject: 'Thank you for applying to Unframe', bodyText: 'All the best, The Team', sender: 'no-reply@eu.greenhouse-mail.io' },
+          held,
+        );
+
+        expect(llmService.classify).toHaveBeenCalledTimes(1);
+      });
+
+      it('leaves the default alone: without the option unmatched mail still goes to the LLM', async () => {
+        llmService.classify.mockResolvedValue(makeLlmResult());
+
+        await service.classify(SAMPLES.irrelevantNoise);
+        await service.classify(SAMPLES.irrelevantNoise, { llmWithoutRuleMatch: true });
+
+        expect(llmService.classify).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it('passes normalized email and rule result context to LLM', async () => {
       llmService.classify.mockResolvedValueOnce(makeLlmResult());
 

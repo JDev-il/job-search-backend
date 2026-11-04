@@ -3,6 +3,7 @@ import { HelperService } from '../../services/helper.service';
 import { EMAIL_SIGNAL_RULES } from '../constants/email-signal-rules.ts';
 import { EmailIntent, RuleField } from '../enums/email.enum';
 import {
+  ClassifyOptions,
   EmailClassificationResult,
   EmailSignalRule,
   IntentSignalRule,
@@ -28,10 +29,10 @@ export class EmailClassificationService {
     private readonly helperService: HelperService
   ) { }
 
-  public async classify(email: ParsedEmail): Promise<EmailClassificationResult> {
+  public async classify(email: ParsedEmail, options: ClassifyOptions = {}): Promise<EmailClassificationResult> {
     const normalized = this.normalizerService.emailNormalizer(email);
     const ruleResult = this.runRules(normalized);
-    const escalate = this.shouldEscalate(ruleResult);
+    const escalate = this.shouldEscalate(ruleResult, options);
     if (!escalate) {
       const result: EmailClassificationResult = {
         ...ruleResult,
@@ -80,8 +81,9 @@ export class EmailClassificationService {
   }
 
   // Escalation decision
-  private shouldEscalate(result: RuleClassificationResult): boolean {
-    if (result.matchedRules.length === 0) return true; // No signal at all from the rule engine
+  private shouldEscalate(result: RuleClassificationResult, options: ClassifyOptions): boolean {
+    // No signal at all from the rule engine: only the caller can say whether that is worth a model call
+    if (result.matchedRules.length === 0) return options.llmWithoutRuleMatch !== false;
     else if (result.intent === EmailIntent.UNKNOWN) return true; // Rule engine gave up on determining an intent
     else if (result.confidence < EMAIL_CLASSIFICATION_LLM_THRESHOLD) return true; // Confidence too low, competing signals or ambiguous content
     else if (result.matchedRules.every(r => r.field === RuleField.SUBJECT)) return true; // Subject-only evidence is insufficient — rejection emails reuse confirmation subjects
